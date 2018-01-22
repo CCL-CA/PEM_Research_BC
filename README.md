@@ -1,2 +1,2 @@
 # PEM_Research_BC
-Shared script for PEM research collaboration
+Shared R-script and documentation for PEM research collaboration
