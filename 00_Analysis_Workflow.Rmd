@@ -1,0 +1,112 @@
+---
+title: "Description of Coding for Random Forest PEM "
+author: "Will Mackenzie and Gen Perkins"
+date: '`r format(Sys.time(), "%Y-%m-%d")`'
+output:
+
+  #pdf_document:
+  #  number_sections: yes
+  #  toc: yes
+  word_document:
+    fig_caption: yes
+    #reference_docx: SampleRmarkdown-Template-STYLE.docx
+    toc: yes
+---
+
+
+```{r setup, include=FALSE}
+
+# Links for RMarkdown help
+
+# Information about RMarkdown is at: http://rmarkdown.rstudio.com
+
+# Chunk options      https://yihui.name/knitr/options/
+
+# Dealing with word templates and Rmarkdown
+#    http://stackoverflow.com/questions/41982700/how-to-properly-number-headings-in-word-from-a-rmarkdown-document
+#    http://rmarkdown.rstudio.com/articles_docx.html   
+#    http://rmarkdown.rstudio.com/word_document_format.html
+
+# Here we open the libraries needed and source any other code as needed
+
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyr)
+library(knitr)
+library(pander)
+
+source('http://www.stat.sfu.ca/~cschwarz/Stat-650/Notes/MyPrograms/schwarz.functions.r')
+
+
+
+
+
+```
+
+##Overview 
+
+The PEM analysis is broadly split into data preparation, pre-processsing, random forest analysis and output comparisons. 
+This is currently completed using 5 scripts. 
+
+
+### 1) Preparing spatial layers 
+
+Create the required layers at a 25m, 10m, 5m scale. All analysis is to be conducted in BC Albers.
+
+
+### 2) 00_Field_Data_prep.r 
+- convert survey 123 outputs to a single table (rename column names, assign rankings to observers, etc) 
+- Export as CSV
+
+
+###3) 01_extract_pt_values_20181025.r
+Part 1: 
+- read in dataset from script 00 or if other changes completed to file (read in raw data file). 
+- extract the point locations (Lat/Long) 
+- create a stack of all raster (base layer variables) 
+- for each data points drill through the stack of rasters and extract values 
+- output the data in a csv file per scales of interest (i.e 5m, 20m, 25m)
+
+Part 2: 
+- read in the shapefile with BCG mapped. 
+- intersect with point data to compare mapped BGC to field calls of BGC. 
+- add TRUE/FALSE where field calls are different to the current mapped BGC layers
+- export as 
+
+
+###4) 02_Random_Forest.r
+-  Read in the data file 
+-  Clean data files (remove columns that are not required for analysis, remove data where there is no information on site series)
+- Subset data for the model run. Theses include the following parameters 
+(BCG, Forest vs Non-Forest, Dominent site series vs other sites series) 
+- In addition the following parameters can also be tested: 
+    - This includes: 
+    + Crew () 
+    + Experience (1,2,3),
+    + Random.Point.ID, (number value or NA - highly skewed to NA)
+    + Certainty (1,2,3,4) 
+    + Transition (1,2,3,4,5,7,Null,Blanks)
+
+
+
+###5) 03_ModelComparison.r
+
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
