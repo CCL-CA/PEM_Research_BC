@@ -1,6 +1,6 @@
 ---
 title: "Description of Coding for Random Forest PEM "
-author: "Will Mackenzie and Gen Perkins"
+author: "Will MacKenzie and Gen Perkins"
 date: '`r format(Sys.time(), "%Y-%m-%d")`'
 output:
 
@@ -36,77 +36,108 @@ library(tidyr)
 library(knitr)
 library(pander)
 
-source('http://www.stat.sfu.ca/~cschwarz/Stat-650/Notes/MyPrograms/schwarz.functions.r')
-
-
-
+#source('http://www.stat.sfu.ca/~cschwarz/Stat-650/Notes/MyPrograms/schwarz.functions.r')
 
 
 ```
 
-##Overview 
+## Overview 
 
-The PEM analysis is broadly split into data preparation, pre-processsing, random forest analysis and output comparisons. 
-This is currently completed using 5 scripts. 
+The PEM analysis uses a combination of spatial software (ArcMap/QGIS/SAGA), online imagery portals (SentinelHub) and R statistical software to prepare the required data and run the analysis. Field data is currently captured using an mobile application (survey123)
+
+The major analysis is currenlty run using R, which is broken up into four scripts. These are broadly grouped into data preparation (00_Field_Data_Prep.R) and pre-processsing (01_extract_pt_values.R), random forest analysis (02_RandomForest.R) and comparison of model outputs (03_ModelComparison.R). 
 
 
 ### 1) Preparing spatial layers 
 
-Create the required layers at a 25m, 10m, 5m scale. All analysis is to be conducted in BC Albers.
+Spatial layers are prepared for the areas of interest in raster compatable formats. Identified spatial layers include: AnisotropicHeating, GeneralCurvature, DEM,  MultiResValleyBottomFlatness, Topographic Wetness Index, Slope,Openness_Negative,
+Openness_Positive,TerrainRuggedness, TopographicPosition, Biogeoclimatic.Unit, Sentinel 16 band imagery, SPOT5, Lidar related products (Canopy Height Model). 
+
+To assess the influence of scale, all layers are prepared at 25m, 10m and 5m scales. All analysis is to be conducted in BC Albers.
 
 
-### 2) 00_Field_Data_prep.r 
-- convert survey 123 outputs to a single table (rename column names, assign rankings to observers, etc) 
-- Export as CSV
+
+### 2) Random Forest Analysis and Assessment 
+
+The major analysis is currenlty run using R, which is broken up into four scripts which are detailed below
 
 
-###3) 01_extract_pt_values_20181025.r
-Part 1: 
+### 00_Field_Data_prep.r 
+Format and tidy field data for processing 
+
+- reads in training point data collected using survey123 
+- tidy and clean training points to convert to single table with columns of interest. This includes renaming columns, assign rankings to observers, editing text or input typing errors. 
+- export a csv to be used as an imput for script 01. 
+
+
+### 01_extract_pt_values.r
+
+Part 1: Extract values of each spatial layer for all training points 
+
 - read in dataset from script 00 or if other changes completed to file (read in raw data file). 
-- extract the point locations (Lat/Long) 
-- create a stack of all raster (base layer variables) 
-- for each data points drill through the stack of rasters and extract values 
-- output the data in a csv file per scales of interest (i.e 5m, 20m, 25m)
+- extract the point location of all training points (Lat/Long) 
+- read in spatial layers prepared above in part 1 and creates a stack of all raster (base layer variables) 
+- for each point, extract the asssociated spatial values for every raster/ spatial layer based on location. Seperate outputs are generated for each scale of interest (i.e 5m, 20m, 25m)
+- output the data (training points and associated raster values) as tables. 
 
-Part 2: 
-- read in the shapefile with BCG mapped. 
-- intersect with point data to compare mapped BGC to field calls of BGC. 
+Part 2: (Optional : Assign mapped BGC information to training points; to be used for furture subseting). 
+
+- read in prep-processed BCG layer (shapefile).
+- intersect training point data with BGC layer and compare with field calls of BGC. 
 - add TRUE/FALSE where field calls are different to the current mapped BGC layers
-- export as 
+- export as a table in csv format 
 
 
-###4) 02_Random_Forest.r
--  Read in the data file 
--  Clean data files (remove columns that are not required for analysis, remove data where there is no information on site series)
-- Subset data for the model run. Theses include the following parameters 
-(BCG, Forest vs Non-Forest, Dominent site series vs other sites series) 
-- In addition the following parameters can also be tested: 
-    - This includes: 
-    + Crew () 
-    + Experience (1,2,3),
-    + Random.Point.ID, (number value or NA - highly skewed to NA)
-    + Certainty (1,2,3,4) 
-    + Transition (1,2,3,4,5,7,Null,Blanks)
+### 02_Random_Forest.r
+This script does the bulk of the analysis using random forest statistics. 
+
+Part 1: 
+
+- Read in the training point file (created in 00_Field_Data_prep,modified in 01_extract_pt_values.r )
+- Clean data (remove columns that are not required for analysis, remove data where there is no information on site series)
+
+Selection Point 1: 
+
+- Subset data for the particular model. Theses include the following parameters 
+    - BCG, Forest vs Non-Forest, Dominent site series vs other sites series
+  
+Selection Point 2: 
+
+- In addition the following parameters can also be tested (where data is available) 
+    - Field crew members () 
+    - Field crew experience rating (1,2,3)
+    - If the field point was generated using a Latin Hyper Cube or another means(i.e walking transect) 
+    - Certainty awarded to the site series call  (1,2,3,4) 
+    - If the site was transitional(1,2,3,4,5,7,Null,Blanks)
+    
+Selection Point 3:
+
+- Assign a proportion of the data to testing and the training (70/30 split?)
+
+Selection Point 4: 
+
+- Set up the variables (spatial data layers) to include in the model. 
+- Define model parameters (response variable, where to output the files, model name, no of trees, how to handle NA values etc.)
 
 
+Part 3: Create the model and generate model diagnostics
 
-###5) 03_ModelComparison.r
+- Run the model (using the R package: Model Map) with the variables and parameters defined above. 
+- Generate or add to an existing table outlining a summary of model outputs. These included Out of Bag Error, ommission, commission error rates, PCC. etc. 
+- Generate of add to an existing table with ommission/ commision rates per model and per site series. 
+These two tables can be used to quickly compare outputs from multiple models as they will continue to add new information with the running of new models. 
+- Generates several diagnostic graphs of the model including Out-Of_bag model prediction,  Variable importance map, a histogram, calibration plot, a ROC plot and AUC plot and error rate
 
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+Part 4: Use the model output to create a map over the entire Study Site. 
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+- Use the spatial layers and model prediction to map the predicted Site series across the Study Area.
+- Plot the map 
+- calculate the frequency of predicted sites series and add to an existing table or generate a new table if none exist. 
 
-```{r cars}
-summary(cars)
-```
 
-## Including Plots
+### 03_ModelComparison.r
 
-You can also embed plots, for example:
+- Read in two maps and create a "difference" map for each comparison of mapped model predictions 
 
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
