@@ -11,6 +11,7 @@
 
 # note this only needs to be run once
 # install.packages(c("raster","rgdal","RSAGA", "tidyr","dplyr")
+# install.packages("Vectorize")
 
 library(tidyr)
 library(raster)
@@ -19,23 +20,22 @@ library(sp)
 library(rgdal)
 library(sf)
 library(ggplot2)
-library(Vectorize)
+#library(Vectorize)
 
 ## check the home directory  
-#getwd()
-
+setwd("D:/PEM_DATA/Analysis")
 ## set up location of drives to input and output
 
-field.data.folder = ("../../Data/Field_data")
+field.data.folder = ("../Data/Field_data")
 #field.data.folder = ("C:/PEM_DATA/Data/Field_data/")
 
-input.folder = ("../../Data/Layers") #list.files(input.folder)
+input.folder = ("../Data/Layers") #list.files(input.folder)
 #input.folder = ("C:/PEM_DATA/Data/Layers/")
 
-out.folder = ("../../Analysis/RandomForest/inputs")
+out.folder = ("../Analysis/RandomForest/inputs")
 
-ss.folder = ("../../Data/Deception_ss/")
-pem.gdb = "C:/PEM_DATA/Data/Deception_ss/Pem.gdb" # contains 
+ss.folder = ("../Data/Deception_ss/")
+pem.gdb = ("..Data/Deception_ss/Pem.gdb") # contains 
 
 #### Step 2) Select pt data you want to use. 
 
