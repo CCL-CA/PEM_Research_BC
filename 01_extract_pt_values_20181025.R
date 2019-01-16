@@ -23,10 +23,10 @@ library(ggplot2)
 #library(Vectorize)
 
 ## check the home directory  
-setwd("D:/PEM_DATA/Analysis")
+setwd("D:/PEM_DATA/")
 ## set up location of drives to input and output
 
-field.data.folder = ("../Data/Field_data")
+field.data.folder = ("Data/Field_data")
 #field.data.folder = ("C:/PEM_DATA/Data/Field_data/")
 
 input.folder = ("../Data/Layers") #list.files(input.folder)
