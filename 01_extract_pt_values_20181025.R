@@ -29,10 +29,10 @@ setwd("D:/PEM_DATA/")
 field.data.folder = ("Data/Field_data")
 #field.data.folder = ("C:/PEM_DATA/Data/Field_data/")
 
-input.folder = ("../Data/Layers") #list.files(input.folder)
+input.folder = ("Data/Layers") #list.files(input.folder)
 #input.folder = ("C:/PEM_DATA/Data/Layers/")
 
-out.folder = ("../Analysis/RandomForest/inputs")
+out.folder = ("Analysis/RandomForest/inputs")
 
 ss.folder = ("../Data/Deception_ss/")
 pem.gdb = ("..Data/Deception_ss/Pem.gdb") # contains 

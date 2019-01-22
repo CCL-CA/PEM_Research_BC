@@ -1,11 +1,12 @@
 
 # script 2: Run the random forest models based on subset of selected variables: 
 
-## Install packages and check libraries; 
-# note this only needs to be run once
-# install.packages(c("raster","rgdal","RSAGA", "tidyr","dplyr")
-# install.packages("ModelMap",dep = T)
-.libPaths("E:/R packages351")
+## Install packages and check libraries;  # note this only needs to be run once
+#install.packages(c("raster","rgdal","RSAGA", "tidyr","dplyr", "ModelMap","randomforest",dep = T)) 
+
+#.libPaths("E:/R packages351") # specify the location of libraries is not using default.
+
+library(dplyr)
 library(tidyr)
 library(raster)
 library(rgdal)
@@ -16,45 +17,38 @@ library(dplyr)
 library(sf)
 library(ggplot2)
 library(stringr)
+library(randomForest)
 
 rm(list=ls())
+
 # check the home directory   
-getwd()
 
 # Step 1: set up location of drives to input and output
-field.data.folder = ("../../Data/Field_data")         # location of full data set 
-in.folder = ("../../Analysis/RandomForest/inputs")    # location of attributes 
-model.folder = ("../../Analysis/RandomForest/outputs") # location of model outputs 
-layer.folder = ("../../Data/Layers") # location of spatial layer inputs
-map.output.folder = ("../../Analysis/Map/outputs")# location of resultant map outputs 
+
+setwd("D:/PEM_DATA/")#check the home directory  # set up work directory 
+field.data.folder = ("Data/Field_data")         # point to field data   #field.data.folder = ("C:/PEM_DATA/Data/Field_data/")
+in.folder = ("Analysis/RandomForest/inputs")    # location of attributes 
+model.folder = ("Analysis/RandomForest/outputs") # location of model outputs 
+layer.folder = ("Data/Layers") # location of spatial layer inputs
+map.output.folder = ("Analysis/Map/outputs")# location of resultant map outputs 
 
 #######################################
 
 ## Step 2: Read in the data file: select more up to date file and read in the datafile
 pts.file = "AllDeception_Pts_Consolidated_WHM_BGC.csv"
-
-#pts.file = "AllDeception_Pts_Consolidated_WHM.csv"
-#pts.file ="AllDeception_Pts_Consolidated_to_2018-09-23_BGC.csv"
-#pts.file ="AllDeception_Pts_Consolidated_to_2018-09-23.csv"
-
 pts.0 = read.csv(paste(field.data.folder,"/",pts.file,sep = ''),stringsAsFactors = FALSE)
       #head(pts.0) ; length(pts.0$Longitude) # error checks
 
 # subset the columns of interest
 pts = pts.0 %>% dplyr::select(c(Longitude, Latitude,GlobalID,Biogeoclimatic.Unit,Site.Physiog_5m,Site.Realm_5m,Site.Group_5m,Site.Class_5m,
                                 Site.Association_5m,Site.Series.Map.Unit_5m,Site.Var.Phase.Map.Unit_5m,MAP_LABEL,BGC_test,Crew,
-        Experience,Random.Point.ID,Certainty,Transition))
-
-head(pts)
-unique(pts$Site.Series.Map.Unit_5m)
-
-## data cleaning of file: 
+                                Experience,Random.Point.ID,Certainty,Transition))
 pts <- pts %>% dplyr::filter(Site.Series.Map.Unit_5m != "")# remove rows with no site series data
-#length(pts$Longitude) # 2307
+
+#head(pts) ; unique(pts$Site.Series.Map.Unit_5m) ; length(pts$Longitude) # 2171# error checks 
 
 
 ## ---------- DECISION 1: HOW TO SUBSAMPLE THE DATA () -------------------
-
 
 ## there are a number of subsets to run for the data to test how the model fits. 
 ## This includes: 
@@ -83,8 +77,8 @@ M.descrip <- "All data and BGCs"
 #pts.t <- pts.t %>% dplyr::filter(str_detect(Crew,"WHM")) ; unique(pts.t$Crew)# M03_allBGC__map
 #MODELfn <- "M04_allBGC_"
 
-pts.t <- pts.t %>% dplyr::filter(Certainty < 3)
-pts.t <- pts.t %>% dplyr::filter(Transition == 1 )
+#pts.t <- pts.t %>% dplyr::filter(Certainty < 3)
+#pts.t <- pts.t %>% dplyr::filter(Transition == 1 )
  
       #####################################################
       # Create some data summaries for your interest 
@@ -127,15 +121,12 @@ pts.t <- pts.t %>% dplyr::filter(Transition == 1 )
 # Subsample the data by BGC or Mapped BCG
 ########################
 
-# split out by BGC units (assigned during the survey)
+#split out by BGC units (assigned during the survey)
 #pts.t <- pts.t %>% filter(Biogeoclimatic.Unit == "SBSmc2")
-pts.t <- pts %>% filter(Biogeoclimatic.Unit == "ESSFmc")
+#pts.t <- pts %>% filter(Biogeoclimatic.Unit == "ESSFmc")
 #pts.t <- pts %>% filter(Biogeoclimatic.Unit == "ESSFmcw")
 
-# split out by BGC units (assigned during the survey)
-
-#pts.t <- pts %>% filter(Biogeoclimatic.Unit == "ESSFmc")
-
+      
 ## ---------- DECISION 3: Select the scale at which the points were extracted (5m,10m,25m) ---------------------
       
 ##Note these files were extracted in script1: 01_extract_pt_values.R
@@ -143,39 +134,42 @@ pts.t <- pts %>% filter(Biogeoclimatic.Unit == "ESSFmc")
       
 att.files = list.files(in.folder) # this provides a list of the csv files generated with attributes 
 
-#file1 = att.files[2]            # choose the scale of interest (change the # to select a different scale)
-file1 <- select.list(att.files, multiple = TRUE,
-                             title = "Choose Folder Containing Spatial Files",graphics = TRUE)
+# need to clean this bit to select the scales (run through a loop)       
+file1 = att.files[2]            # choose the scale of interest (change the # to select a different scale)
+
+#file1 <- select.list(att.files, multiple = TRUE,
+#                             title = "Choose Folder Containing Spatial Files",graphics = TRUE)
+
 scale.analysis = str_sub(gsub("*D_|_pts.*","", file1),start = -3)   # grab the scale to add to summary table
 
 foi.0 = read.csv(paste(in.folder,file1,sep = "/"),header = TRUE) # read in the file
 foi.0 = foi.0 %>%
-  select(-c(X,Longitude,Latitude,ObjectID,ID)) 
+  dplyr::select(-c(X,Longitude,Latitude,ObjectID,ID)) 
 
 qdatafn = left_join(pts.t,foi.0, by = "GlobalID") # join the attribute file to the Site series data set (field data)
 
 # tidy up the data set 
 qdatafn <- qdatafn %>%
   mutate (ID = seq(1,length(qdatafn$GlobalID),1)) %>%
-  select(-c(GlobalID))
+  dplyr::select(-c(GlobalID))
 
-# GP Notes to fix error when running model (if using na.omit) If your subset contains 
-#levels(droplevels(qdatafn$SiteSeries))
-#qdatafn$SiteSeries <- factor(qdatafn$SiteSeries);
-#groupA <- droplevels(dataset2[dataset2$order=="groupA",])
-
-## define the test and training set names # this is not needed as using an out of bag error metric 
-# head(qdatafn) ; names(qdatafn)
+        # GP Notes to fix error when running model (if using na.omit) If your subset contains 
+        #levels(droplevels(qdatafn$SiteSeries))
+        #qdatafn$SiteSeries <- factor(qdatafn$SiteSeries);
+        #groupA <- droplevels(dataset2[dataset2$order=="groupA",])
 
 # create a testing and training data set by random allocation of points 
-# randomly seperate into training and testing datasets. 
-#get.test(proportion.test=0.2,
-#          qdatafn=qdatafn,
-#          seed=42,
-#          folder=in.folder,
-#          qdata.trainfn="qdatafn.train.csv",
-#          qdata.testfn="qdatafn.test.csv")
-#
+# User needs to define the proportion of test/training set 
+
+prop.test=0.2 # change this as needed 
+
+get.test(proportion.test=prop.test,
+          qdatafn=qdatafn,
+          seed=42,
+          folder=in.folder,
+          qdata.trainfn="qdatafn.train.csv",
+          qdata.testfn="qdatafn.test.csv")
+
 #qdatafn <- is.matrix(qdatafn)
 
 #get the working directory and assign it to the variable "folder" so we know where to put the results of the analysis
@@ -194,8 +188,9 @@ M_description <-  "TemporaryRuns" #write in a description here as you want "
 
 #Identify the factors in the csv file that contain data to help predict the individual site series
 predList <- c("AnisotropicHeating",
+              "CHM",
               "GeneralCurvature",
-              #"Dec_dem_BCALbers_25m",
+              "Dec_dem_BCALbers",
               "MultiResValleyBottomFlatness",
               "TWI",
               "Slope",
@@ -203,8 +198,30 @@ predList <- c("AnisotropicHeating",
               "Openness_Positive",
               "TerrainRuggedness",
               "TopographicPosition",
-              "Biogeoclimatic.Unit")
-
+              "Biogeoclimatic.Unit",
+              "Li_below2ave",	
+              "Li_below2min",	
+              "Li_below2max",	
+              "Li_demcov",	
+              #"Li_p95",
+              #"NDVI",
+              "Sen_B01",
+              "Sen_B02",	
+              "Sen_B03",	
+              "Sen_B04",	
+              "Sen_B05",
+              "Sen_B06",
+              "Sen_B07",	
+              "Sen_B08",
+              #"Sen_B08A",	
+              "Sen_B09",
+              "Sen_B10",
+              "Sen_B11",
+              "Sen_B12",
+              "Sen_TCI.1",	
+              "Sen_TCI.2",
+              "Sen_TCI.3")
+            
 #If any of the predictors were categorical variables I would identify them with the following command
 #except it would be predFactor <- c("List the variable") - Don't forget the c in front of the first parenthesis
 predFactor <- ("Biogeoclimatic.Unit")
@@ -212,20 +229,25 @@ predFactor <- ("Biogeoclimatic.Unit")
 #predFactor <- FALSE  #I would type this if there were no categorical variables #BGC layer? 
 
 # calcaulte the no of input parameters to be used later on in summary table 
-#if (predFactor == FALSE){ length.pred = 0}else { length.pred = length(predFactor) }
-#no.params <-length(predList) + length.pred
+if (predFactor == FALSE){ length.pred = 0}else { length.pred = length(predFactor) }
+no.params <-length(predList) + length.pred
 
 #Define the response variable and state whether it is binary (present absent 1/0) or continuous or categorical.  These variables match
 #the names I have used in the csv file.
 
-#response.name = "Site.Series.Map.Unit_5m" 
-response.name <- select.list(colnames(pts.t[,5:11]), multiple = FALSE,
-                             title = "Choose Functional Level",graphics = TRUE)
+response.name = "Site.Series.Map.Unit_5m" 
+
+#or
+#response.name <- select.list(colnames(pts.t[,5:11]), multiple = FALSE,
+#                             title = "Choose Functional Level",graphics = TRUE)
+
 qdatafn2 <- qdatafn
+
 ####Optional remove categories with < X training points
 response.number <- count(qdatafn, vars= qdatafn[,c(response.name)] )
 response.good <-response.number[response.number$n >10,] ## set minimum number of training points to allow inclusion of unit
 qdatafn2 <- qdatafn [qdatafn[,c(response.name)] %in% response.good$vars,]
+
 ###########sample size calculation for rebalancing (or not)
 sampsize <- count(qdatafn2,vars= qdatafn2[,c(response.name)] )
 sampsize <- sampsize$n
@@ -333,6 +355,8 @@ OM <-rbind(c("Model",MODELfn,MODELfn),OM)
 #                             predicted = as.matrix(pred[,-c(1,2,3)]))
 #mauc <- HandTill2001::auc(VOTE)
 
+model.folder = "Analysis/RandomForest/outputs"
+
 # output the model output by adding a row to a table with all imputs
 sum.data <- read.csv(paste(model.folder,"/","MODEL_OUTPUTS.csv",sep = ""),header = TRUE,stringsAsFactors = FALSE)
 dline = c(MODELfn,M.descrip, no.params,scale.analysis,CMX.PCC,Ave.om,Ave.com,kap,kap.sd)
@@ -351,7 +375,7 @@ write.csv(OM.data,paste(model.folder,"/","MODEL_OM_COM.csv",sep = ""),row.names 
 data.folder <- gsub("*D_|_pts.*","", file1)
 
 folder = paste(layer.folder,data.folder,"layers/",sep = "/") # create the filepath where the layers are stored (use the same scale as points extracted from )
-list.files(folder)
+list.files(folder,pattern ="\\.tif$")
 
 rastLUTfn <- "ModelMapData_LUT.csv" # need to update this with more layers
 rastLUTfn <- read.table(paste(in.folder,rastLUTfn,sep = "/"),
