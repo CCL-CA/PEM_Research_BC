@@ -66,7 +66,7 @@ m.no <- 2
 
 # subset the sample data by random point or not 
 randpt <- as.character(mparam[m.no,"Random.Pt.ID"])
-
+randpt <- ifelse()
 ## adjust this to match text 
 
 randpt.r <- regmatches(randpt, gregexpr("[[:digit:]]+", randpt.r)) ; expe.r <- as.numeric(unlist(expe.r))

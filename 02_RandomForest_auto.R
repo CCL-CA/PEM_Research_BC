@@ -113,19 +113,13 @@ M.descrip <- "All data and BGCs"
         group_by(Biogeoclimatic.Unit) %>%
         summarise(count = n())
       #####################################################
-
-      # get a quick summary of the types
-      #unique(pts$Biogeoclimatic.Unit)
-       #"SBSmc2"  "ESSFmc"  "ESSFmcw"        "ESSF"    "SBS"  
-      #sort(unique(pts$Site.Series.Map.Unit_5m))
-      #unique(pts$MAP_LABEL)
-      #[1] SBSmc2 ESSFmc
-
       
-# might need to remove the site series with very low sample points 
           
 ## ---------- DECISION 2: HOW TO SUBSAMPLE THE DATA BY BGC UNIT () ---------------------
-      
+
+#      
+Response variables      
+            
 ## Subset the data per BGC unit: either by field defined BGC or by GIS defined BGC
   ## This includes: 
       ## 1) Biogeoclimatic.Unit
