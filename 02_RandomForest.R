@@ -21,52 +21,48 @@ library(randomForest)
 
 rm(list=ls())
 
-# check the home directory   
-
-# Step 1: set up location of drives to input and output
+# INPUT 1: set up location of drives to input and output
 
 setwd("D:/PEM_DATA/")#check the home directory  # set up work directory 
 
-# read in the list with all model parameters
-mparam <- read.csv("Model_params.csv",header = TRUE,stringsAsFactors = TRUE)
+    # read in the list with all model parameters
+    mparam <- read.csv("Model_params.csv",header = TRUE,stringsAsFactors = TRUE)
 
-# select the model you want to run (Ammend to run multiple models) 
+# INPUT 2: select the model you want to run (Ammend to run multiple models) 
 m.no <- 2
 
-# set up the folders 
-mp <- mparam[m.no,] #view list of parameters
+    # set up the folders 
+    mp <- mparam[m.no,] #view list of parameters
+    
+    field.data.folder = mparam[m.no,"field.data"]
+    in.folder = mparam[m.no,"in.folder"]
+    model.folder = mparam[m.no,"model.folder"]
+    layer.folder = mparam[m.no,"layer.folder"]
+    map.output.folder = mparam[m.no,"map.output.folder"]
+    
+    #read in the raw point file 
+    pts.file = mparam[m.no,"raw.data.file"]
+    pts.0 = read.csv(paste(field.data.folder,"/",pts.file,sep = ''),stringsAsFactors = FALSE)     #head(pts.0) ; length(pts.0$Longitude) # error checks
 
-field.data.folder = mparam[m.no,"field.data"]
-in.folder = mparam[m.no,"in.folder"]
-model.folder = mparam[m.no,"model.folder"]
-layer.folder = mparam[m.no,"layer.folder"]
-map.output.folder = mparam[m.no,"map.output.folder"]
+    # subset the columns of interest
+    pts = pts.0 %>% dplyr::select(c(Longitude, Latitude,GlobalID,Biogeoclimatic.Unit,Site.Physiog_5m,Site.Realm_5m,Site.Group_5m,Site.Class_5m,
+                                    Site.Association_5m,Site.Series.Map.Unit_5m,Site.Var.Phase.Map.Unit_5m,MAP_LABEL,BGC_test,Crew,Experience,Random.Point.ID,Certainty,Transition))
+    pts <- pts %>% dplyr::filter(Site.Series.Map.Unit_5m != "")# remove rows with no site series data
 
-#read in the raw point file 
-pts.file = mparam[m.no,"raw.data.file"]
-pts.0 = read.csv(paste(field.data.folder,"/",pts.file,sep = ''),stringsAsFactors = FALSE)     #head(pts.0) ; length(pts.0$Longitude) # error checks
-
-# subset the columns of interest
-pts = pts.0 %>% dplyr::select(c(Longitude, Latitude,GlobalID,Biogeoclimatic.Unit,Site.Physiog_5m,Site.Realm_5m,Site.Group_5m,Site.Class_5m,
-                                Site.Association_5m,Site.Series.Map.Unit_5m,Site.Var.Phase.Map.Unit_5m,MAP_LABEL,BGC_test,Crew,
-                                Experience,Random.Point.ID,Certainty,Transition))
-pts <- pts %>% dplyr::filter(Site.Series.Map.Unit_5m != "")# remove rows with no site series data
-
-
-# subset the sample data by certainty 
-cert <- as.character(mparam[m.no,"Certainty"])
-cert.r <- regmatches(cert, gregexpr("[[:digit:]]+", cert)) ; cert.r <- as.numeric(unlist(cert.r))
-pts <- pts %>% dplyr::filter(Certainty %in% cert.r)
-
-# subset the sample data by transition zone 
-trans <- as.character(mparam[m.no,"Transition"])
-trans.r <- regmatches(trans, gregexpr("[[:digit:]]+", trans)) ; trans.r <- as.numeric(unlist(trans.r))
-pts <- pts %>% dplyr::filter(Transition %in% trans.r)
-
-# subset the sample data by experience of field staff
-expe <- as.character(mparam[m.no,"Experience"])
-expe.r <- regmatches(expe, gregexpr("[[:digit:]]+", expe)) ; expe.r <- as.numeric(unlist(expe.r))
-pts <- pts %>% dplyr::filter(Experience %in% trans.r)
+    # subset the sample data by certainty 
+    cert <- as.character(mparam[m.no,"Certainty"])
+    cert.r <- regmatches(cert, gregexpr("[[:digit:]]+", cert)) ; cert.r <- as.numeric(unlist(cert.r))
+    pts <- pts %>% dplyr::filter(Certainty %in% cert.r)
+    
+    # subset the sample data by transition zone 
+    trans <- as.character(mparam[m.no,"Transition"])
+    trans.r <- regmatches(trans, gregexpr("[[:digit:]]+", trans)) ; trans.r <- as.numeric(unlist(trans.r))
+    pts <- pts %>% dplyr::filter(Transition %in% trans.r)
+    
+    # subset the sample data by experience of field staff
+    expe <- as.character(mparam[m.no,"Experience"])
+    expe.r <- regmatches(expe, gregexpr("[[:digit:]]+", expe)) ; expe.r <- as.numeric(unlist(expe.r))
+    pts <- pts %>% dplyr::filter(Experience %in% trans.r)
 
 # subset the sample data by random point or not 
 randpt <- as.character(mparam[m.no,"Random.Pt.ID"])
