@@ -22,28 +22,17 @@ library(sf)
 library(ggplot2)
 #library(Vectorize)
 
-## check the home directory  
-setwd("D:/PEM_DATA/")
-## set up location of drives to input and output
+## ## set up location of drives to input and output
 
-field.data.folder = ("Data/Field_data")
-#field.data.folder = ("C:/PEM_DATA/Data/Field_data/")
-
-input.folder = ("Data/Layers") #list.files(input.folder)
-#input.folder = ("C:/PEM_DATA/Data/Layers/")
-
-out.folder = ("Analysis/RandomForest/inputs")
-
-ss.folder = ("../Data/Deception_ss/")
-pem.gdb = ("..Data/Deception_ss/Pem.gdb") # contains 
+setwd("D:/PEM_DATA/")#check the home directory  # set up work directory 
+field.data.folder = ("Data/Field_data")         # point to field data   #field.data.folder = ("C:/PEM_DATA/Data/Field_data/")
+input.folder = ("Data/Layers")                  # point to where layers are stored  #list.files(input.folder) #input.folder = ("C:/PEM_DATA/Data/Layers/")
+out.folder = ("Analysis/RandomForest/inputs")   # Point to where your random forest outputs will be stored
+ss.folder = ("Data/Deception_ss/")        
+pem.gdb = ("Data/Deception_ss/Pem.gdb") # contains 
 
 #### Step 2) Select pt data you want to use. 
 
-# enter points file.
-# note need to combine the Old file with the latest file. Note these have different fields and need to be treated differently then combined. 
-
-#pts.file = "AllDeception_Pts_Consolidated_to_July13.csv"
-#pts.file ="AllDeception_Pts_Consolidated_to_2018-09-23.csv"
 pts.file ="AllDeception_Pts_Consolidated_WHM.csv"
 
 ## or manually choose file: 
@@ -55,17 +44,8 @@ pts.file ="AllDeception_Pts_Consolidated_WHM.csv"
 
 pts = read.csv(paste(field.data.folder,"/",pts.file,sep = ''),stringsAsFactors = FALSE)
 
-## check the files for errors
-# problem with Dates that might need to be fixed 
-#unique(pts$Date) ; range(pts$Date)
-
-# extract the Lat/Longs. 
-LatLon <- pts %>% dplyr::select(c(Longitude,Latitude,ObjectID,GlobalID))
-LatLon <- na.omit(LatLon)
-
-#length(LatLon$Longitude) # check the length of the files
-# check type of files: 
-#str(LatLon)
+LatLon <- pts %>% dplyr::select(c(Longitude,Latitude,ObjectID,GlobalID))     # extract the Lat/Longs. 
+LatLon <- na.omit(LatLon)         #length(LatLon$Longitude) # error check:check the length of the files
 
 # get co-ordinates and convert from WGs to albers to match the base layers
 coordinates(LatLon)=~Longitude + Latitude
@@ -79,29 +59,34 @@ plot(pts)
 ###################################################################
 
 # list contains all raster files we want to extract the attributes from. 
-
 layers.list = as.list(list.dirs(input.folder,full.names=TRUE))
+
 
 # STILL TO DO
 # Adjust these script so automate the scale 
-#foi = c("Dec_25m","Dec_10m","Dec_5m") 
+#foi = c("Data/Layers/Dec_25m","Data/Layers/Dec_10m","Data/Layers/Dec_5m") 
+#layers.list[grep("Data/Layers/Dec_25m",layers.list)]
+#layers.list[grep(foi,layers.list)]
+
 
 # create a list of layer files to use 
-LOI = c(layers.list[8],layers.list[3],layers.list[6])#,layers.list[4])
+LOI = c(layers.list[16],layers.list[3])# ,layers.list[18])#,layers.list[4])
 
 # loop through all data folders/data sets to generate the csv attribute files for 5,10,25m scales. 
 
 for(ii in 1:length(LOI)) { 
-    #ii = 3
+   # ii = 1
     i = LOI[ii]
     i.name = gsub(input.folder,"",paste(i))
     i.name = gsub("/layers","",i.name)
     i.scale = gsub("/Dec_","",i.name)
-    
+  
     ## check the list of rasters to extract from: 
     #f <- list.files(path=paste(i),recursive=TRUE, full.names=TRUE, all.files=TRUE, pattern ='.tif$')
     Covariates <-  list.files(path= paste(i),recursive=TRUE, full.names=TRUE, all.files=TRUE, pattern ="\\.tif$")
-    Covariates <-  stack(Covariates)
+    Covariates <-  stack(Covariates) #,quick = TRUE)
+    #plot(Covariates)
+    
     proj4string(Covariates) <- CRS("+init=epsg:3005") 
     #prs <- "+proj=aea +lat_1=50 +lat_2=58.5 +lat_0=45 +lon_0=-126 +x_0=1000000 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
     #pr1 <- projectRaster(Covariates,crs = prs)
@@ -152,41 +137,8 @@ pts.out = dplyr::left_join(pts.0,pts.int.df)#,by = "GlobalID")
 pts.out <- pts.out %>% dplyr::select(-(X))# remove X columns 
 pts.out$BGC_test <- mapply(grepl, pattern=pts.out$Biogeoclimatic.Unit, x=pts.out$MAP_LABEL)
 
-## Formatting crew names and other error checking # already done
-#pts.out$Crew
-#head(pts.out)
-
-#pts.out =  pts.out %>% 
-#        mutate(Crew = toupper(trimws(Crew, which= "both"))) %>%
-#        mutate(Crew = gsub(". ",",",Crew))%>%
-#        mutate(Crew = gsub(",,",",",Crew))
-#unique(pts.out$Crew) 
-
 pts.file.out = "AllDeception_Pts_Consolidated_WHM_BGC.csv"
 
 write.csv(pts.out,paste(field.data.folder,"/",pts.file.out,sep = ''))
-
-
-
-
-
-
-
-
-
-### OLD STUFF #####
-
-#for(i in 1:length(f)){
-
-#	pr <- raster(f[i])
-#	# extract raster values at specified coordinates
-#	attributes <- extract(pr, coordinates(pts), df=TRUE)
-	# transpose attributes in data frame. The write function only writes in rows (top to bottom)
-#	attributes <- t(attributes)
-	# write(x, i) appends data x to file i. 
-#	write(attributes, file="E:\\RandomForest_Deception\\AllDeception_Pts_att.csv", sep=",", append=a, ncol=length(attributes))
-#	a=TRUE
-#}
-#list.files(path="U:\\Heather_Richardson\\All_Cleaned_Layers\\", full.names=FALSE, pattern='.asc')
 
 
