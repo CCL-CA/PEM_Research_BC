@@ -55,21 +55,32 @@ pts <- pts %>% dplyr::filter(Site.Series.Map.Unit_5m != "")# remove rows with no
 
 # subset the sample data by certainty 
 cert <- as.character(mparam[m.no,"Certainty"])
-cert.r <- regmatches(cert, gregexpr("[[:digit:]]+", cert))
-cert.r <- as.numeric(unlist(matches))
+cert.r <- regmatches(cert, gregexpr("[[:digit:]]+", cert)) ; cert.r <- as.numeric(unlist(cert.r))
 pts <- pts %>% dplyr::filter(Certainty %in% cert.r)
 
 # subset the sample data by transition zone 
-
 trans <- as.character(mparam[m.no,"Transition"])
-cert.r <- regmatches(cert, gregexpr("[[:digit:]]+", cert))
-cert.r <- as.numeric(unlist(matches))
-pts <- pts %>% dplyr::filter(Certainty %in% cert.r)
+trans.r <- regmatches(trans, gregexpr("[[:digit:]]+", trans)) ; trans.r <- as.numeric(unlist(trans.r))
+pts <- pts %>% dplyr::filter(Transition %in% trans.r)
+
+# subset the sample data by experience of field staff
+expe <- as.character(mparam[m.no,"Experience"])
+expe.r <- regmatches(expe, gregexpr("[[:digit:]]+", expe)) ; expe.r <- as.numeric(unlist(expe.r))
+pts <- pts %>% dplyr::filter(Experience %in% trans.r)
+
+# subset the sample data by random point or not 
+randpt <- as.character(mparam[m.no,"Random.Pt.ID"])
+
+## adjust this to match text 
+
+randpt.r <- regmatches(randpt, gregexpr("[[:digit:]]+", randpt.r)) ; expe.r <- as.numeric(unlist(expe.r))
+pts <- pts %>% dplyr::filter(Experience %in% trans.r)
 
 
+unique(pts$Experience)
 
-pts.t <- pts.t %>% dplyr::filter(Certainty < 3)
 
+# Crew 
 
 
 ## ---------- DECISION 1: HOW TO SUBSAMPLE THE DATA () -------------------
@@ -80,31 +91,14 @@ pts.t <- pts.t %>% dplyr::filter(Certainty < 3)
         #[1] "BJR","BJR,WM","BJR,WM,EC","EAC","EAC,WHM","EBL","KSD"          
         #[9] "PRD","WHM","WHM,AMR","WHM,BJR", "WHM,KSD","WHM,EAC"     
         #[17] "WHM,EAC","WHM,EAC,KSD","HPG"  
-    ## 2) Experience (1,2,3),
-    ## 3) Random.Point.ID, (number value or NA - hi ghly skewed to NA)
-    ## 4) Certainty (1,2,3,4) - number highly skewed to 2
-    ## 5) Transition (1,2,3,4,5,7,Null,Blanks) (2 x blank)
-
+    
+   
 # add a new model name with each of the model runs
 
 pts.t = pts# M01_allBGC__map    ## All data
 MODELfn <- "M01_allBGC_"
 M.descrip <- "All data and BGCs"
 
-#pts.t <- pts %>% dplyr::filter(Experience == 1)   ## Data with experience of 1
-#MODELfn <- "M02_allBGC_"
-#M.descrip <- "all BGC experience = 1"
-
-#pts.t <- pts %>% dplyr::filter(Experience != 1) 
-#MODELfn <- "M03_allBGC_"
-
-#pts.t <- pts.t %>% dplyr::filter(str_detect(Crew,"WHM")) ; unique(pts.t$Crew)# M03_allBGC__map
-#MODELfn <- "M04_allBGC_"
-
-
-pts.t <- pts.t %>% dplyr::filter(Certainty < 3)
-
-#pts.t <- pts.t %>% dplyr::filter(Transition == 1 )
  
       #####################################################
       # Create some data summaries for your interest 
