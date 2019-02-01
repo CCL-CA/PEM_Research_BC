@@ -18,6 +18,8 @@ library(sf)
 library(ggplot2)
 library(stringr)
 library(randomForest)
+library(gsubfn)
+library(tidyverse)
 
 rm(list=ls())
 
@@ -26,19 +28,23 @@ rm(list=ls())
 setwd("D:/PEM_DATA/")#check the home directory  # set up work directory 
 
     # read in the list with all model parameters
-    mparam <- read.csv("Model_params.csv",header = TRUE,stringsAsFactors = TRUE)
-
-# INPUT 2: select the model you want to run (Ammend to run multiple models) 
+    mparam <- read.csv("Model_param.csv",header = TRUE,stringsAsFactors = TRUE)
+    
+    
+# INPUT 2: select the model you want to run (Ammend to run multiple models) # add a loop here 
 m.no <- 2
 
-    # set up the folders 
+    # set up folders 
     mp <- mparam[m.no,] #view list of parameters
-    
     field.data.folder = mparam[m.no,"field.data"]
     in.folder = mparam[m.no,"in.folder"]
     model.folder = mparam[m.no,"model.folder"]
     layer.folder = mparam[m.no,"layer.folder"]
     map.output.folder = mparam[m.no,"map.output.folder"]
+    
+    # set up model name and description
+    MODELfn <- mparam[m.no,"model.no"]
+    M.descrip <- mparam[m.no,"M.description"]
     
     #read in the raw point file 
     pts.file = mparam[m.no,"raw.data.file"]
@@ -49,104 +55,83 @@ m.no <- 2
                                     Site.Association_5m,Site.Series.Map.Unit_5m,Site.Var.Phase.Map.Unit_5m,MAP_LABEL,BGC_test,Crew,Experience,Random.Point.ID,Certainty,Transition))
     pts <- pts %>% dplyr::filter(Site.Series.Map.Unit_5m != "")# remove rows with no site series data
 
-    # subset the sample data by certainty 
+    
+# PART 1: TESTING DATA QUALITY METRICS: Certainty/Staff/transition zone / random points used 
+    
+    # Certainty: subset the sample data by certainty 
     cert <- as.character(mparam[m.no,"Certainty"])
     cert.r <- regmatches(cert, gregexpr("[[:digit:]]+", cert)) ; cert.r <- as.numeric(unlist(cert.r))
     pts <- pts %>% dplyr::filter(Certainty %in% cert.r)
     
-    # subset the sample data by transition zone 
+    # Transition Zone: subset the sample data by transition zone 
     trans <- as.character(mparam[m.no,"Transition"])
     trans.r <- regmatches(trans, gregexpr("[[:digit:]]+", trans)) ; trans.r <- as.numeric(unlist(trans.r))
     pts <- pts %>% dplyr::filter(Transition %in% trans.r)
     
-    # subset the sample data by experience of field staff
+    # Field Crew Experience: subset the sample data by experience of field staff
     expe <- as.character(mparam[m.no,"Experience"])
     expe.r <- regmatches(expe, gregexpr("[[:digit:]]+", expe)) ; expe.r <- as.numeric(unlist(expe.r))
-    pts <- pts %>% dplyr::filter(Experience %in% trans.r)
+    pts <- pts %>% dplyr::filter(Experience %in% expe.r)
 
-# subset the sample data by random point or not 
-randpt <- as.character(mparam[m.no,"Random.Pt.ID"])
-randpt <- ifelse()
-## adjust this to match text 
-
-randpt.r <- regmatches(randpt, gregexpr("[[:digit:]]+", randpt.r)) ; expe.r <- as.numeric(unlist(expe.r))
-pts <- pts %>% dplyr::filter(Experience %in% trans.r)
-
-
-unique(pts$Experience)
-
-
-# Crew 
-
-
-## ---------- DECISION 1: HOW TO SUBSAMPLE THE DATA () -------------------
-
-## there are a number of subsets to run for the data to test how the model fits. 
-## This includes: 
-    ## 1) Crew () 
-        #[1] "BJR","BJR,WM","BJR,WM,EC","EAC","EAC,WHM","EBL","KSD"          
-        #[9] "PRD","WHM","WHM,AMR","WHM,BJR", "WHM,KSD","WHM,EAC"     
-        #[17] "WHM,EAC","WHM,EAC,KSD","HPG"  
+    ## STILL TO COMPLETE 
+    # Random Points: subset the sample data by random point or not 
+    #randpt <- as.character(mparam[m.no,"Random.Pt.ID"])
+    #if(randpt == "yes") { 
+    #  pts <- pts %>% dplyr::filter(is.na(Random.Point.ID))} else {
+    #    pts <- pts %>% drop_na( Random.Point.ID) } 
     
-   
-# add a new model name with each of the model runs
-
-pts.t = pts# M01_allBGC__map    ## All data
-MODELfn <- "M01_allBGC_"
-M.descrip <- "All data and BGCs"
-
- 
-      #####################################################
-      # Create some data summaries for your interest 
-      
-      #####################################################
-      # create some summary data points to check the raw data 
-      sums <- pts %>% 
-        dplyr::group_by(Biogeoclimatic.Unit,Site.Series.Map.Unit_5m) %>%
-        summarise(count = n())
-        
-      write.csv(sums,paste(field.data.folder,"data_summary_by_BGC.csv",sep = "/")) 
-      ggplot(sums, aes(count)) + geom_histogram()
-      
-      sums.essf <- sums %>% filter(Biogeoclimatic.Unit == "ESSF")
-      sums1 <- pts %>% 
-        group_by(Biogeoclimatic.Unit) %>%
-        summarise(count = n())
-      #####################################################
-
-      # get a quick summary of the types
-      #unique(pts$Biogeoclimatic.Unit)
-       #"SBSmc2"  "ESSFmc"  "ESSFmcw"        "ESSF"    "SBS"  
-      #sort(unique(pts$Site.Series.Map.Unit_5m))
-      #unique(pts$MAP_LABEL)
-      #[1] SBSmc2 ESSFmc
-
-      
-# might need to remove the site series with very low sample points 
-          
-## ---------- DECISION 2: HOW TO SUBSAMPLE THE DATA BY BGC UNIT () ---------------------
-      
+  
+    # Field Crew Individuals: subset the sample data by crew = blank = all staff
+    #"BJR","BJR,WM","BJR,WM,EC","EAC","EAC,WHM","EBL","KSD","PRD","WHM","WHM,AMR","WHM,BJR", "WHM,KSD","WHM,EAC", "WHM,EAC","WHM,EAC,KSD","HPG"  
+    crew.r <- as.character(mparam[m.no,"Crew"])
+    crew.r.oi <- str_split(crew.r, ",", n = Inf, simplify = FALSE)  # to upper needed?
+    crew.r.oi  <- as.character(str_trim(unlist(crew.r.oi),"both"))
+    if (crew.r.oi == "") { 
+      pts <- pts } else { 
+      pts <- pts %>% filter(str_detect(Crew, crew.r.oi))}
+    
+     
+# PART 2: SELECTING / Limiting to Levels with BGC vs Forest/Non - Forest TESTING DATA QUALITY METRICS: Certainty/Staff/transition zone / random points used
+                
 ## Subset the data per BGC unit: either by field defined BGC or by GIS defined BGC
-  ## This includes: 
-      ## 1) Biogeoclimatic.Unit
-      ## 2) Site.Group_5m : Forest or non_forest 
-      ## 3) Site.Series.Map.Unit_5m  () site series within the SS name? 
-      ## 4) GIS mapped BGS = (MAP_LABEL),Note use the column BGC_test if you want to check the difference between the field assigned BGC and the GIS defined BGC
+    ## This includes: 
+    ## 1) Biogeoclimatic.Unit
+    ## 2) Site.Group_5m : Forest or non_forest 
+    ## 3) Site.Series.Map.Unit_5m  () site series within the SS name? 
+    ## 4) GIS mapped BGS = (MAP_LABEL),Note use the column BGC_test if you want to check the difference between the field assigned BGC and the GIS defined BGC
+                
+                
+      # BGC Unit : subset the sample data by BGC assigned during the survey 
+      bgc.unit <- as.character(mparam[m.no,"BGC.unit"])
+      bgc.unit.oi <- str_split(bgc.unit, ",", n = Inf, simplify = FALSE) 
+      bgc.unit.oi  <- as.character(str_trim(unlist(bgc.unit.oi ),"both"))
+      if (bgc.unit.oi == "") { 
+        pts <- pts } else { 
+          pts <- pts %>% filter(Biogeoclimatic.Unit %in% bgc.unit.oi)}
       
-########################
-# Subsample the data by BGC or Mapped BCG
-########################
-
-#split out by BGC units (assigned during the survey)
-pts.t <- pts.t %>% filter(Biogeoclimatic.Unit == "SBSmc2")
-#pts.t <- pts %>% filter(Biogeoclimatic.Unit == "ESSFmc")
-#pts.t <- pts %>% filter(Biogeoclimatic.Unit == "ESSFmcw")
-
+      # Forest: Non-Forest Testing : subset the sample data by BGC assigned during the survey   ## 2) Site.Group_5m : Forest or non_forest 
+      Fnonf <- as.character(mparam[m.no,"Site.Phys"])
+      Fnonf.oi <- str_split(Fnonf, ",", n = Inf, simplify = FALSE) 
+      Fnonf.oi  <- as.character(str_trim(unlist(Fnonf.oi ),"both"))
+      if (Fnonf.oi == "") { 
+        pts <- pts } else { 
+          pts <- pts %>% filter(str_detect(Site.Physiog_5m, Fnonf.oi))}
+    
+      ## Terrestrial or Wetland: Site.Realm : Terrestrial or Wetland 
+      TerWet <- as.character(mparam[m.no,"Site.Realm"])
+      TerWet.oi <- str_split(TerWet, ",", n = Inf, simplify = FALSE) 
+      TerWet.oi  <- as.character(str_trim(unlist(TerWet.oi ),"both"))
+      if (TerWet.oi == "") { 
+        pts <- pts } else { 
+          pts <- pts %>% filter(str_detect(Site.Realm_5m,TerWet.oi ))}
       
+
+      print(paste("You have",length(pts$Longitude) ,"samples for this model",sep = " ")) 
+
+       
 ## ---------- DECISION 3: Select the scale at which the points were extracted (5m,10m,25m) ---------------------
       
-##Note these files were extracted in script1: 01_extract_pt_values.R
-##  Select the scale at which the points were extracted  
+ 
       
 #att.files = list.files(in.folder) # this provides a list of the csv files generated with attributes 
 att.files = list.files(path=paste(in.folder,"/"),recursive=TRUE, full.names=FALSE, all.files=TRUE, pattern ="\\_pts_att.csv")
