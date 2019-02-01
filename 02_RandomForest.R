@@ -1,5 +1,11 @@
-
 # script 2: Run the random forest models based on subset of selected variables: 
+
+# Note :  this script relies on setting up model inputs in advance. This includes
+#   1) Model_param.csv = a csv which lists all the input parameters and model perameters
+#   2) Model_layers.csv = a csv which lists each model and the layers to be in[put for each model run. 
+        
+# note the row number of model.no is 4 == the corresponding M4 in the Model_layers.csv 
+
 
 ## Install packages and check libraries;  # note this only needs to be run once
 #install.packages(c("raster","rgdal","RSAGA", "tidyr","dplyr", "ModelMap","randomforest",dep = T)) 
@@ -20,6 +26,8 @@ library(stringr)
 library(randomForest)
 library(gsubfn)
 library(tidyverse)
+library(RColorBrewer)
+library(colorspace)
 
 rm(list=ls())
 
@@ -27,12 +35,16 @@ rm(list=ls())
 
 setwd("D:/PEM_DATA/")#check the home directory  # set up work directory 
 
-    # read in the list with all model parameters
-    mparam <- read.csv("Model_param.csv",header = TRUE,stringsAsFactors = TRUE)
-    
+mparam <- read.csv("Model_param.csv",header = TRUE,stringsAsFactors = TRUE)    # read in the list with all model parameters
     
 # INPUT 2: select the model you want to run (Ammend to run multiple models) # add a loop here 
-m.no <- 2
+m.to.run <- mparam %>% dplyr::select(To.Run,model.no) %>% dplyr::filter(To.Run == 1)
+m.to.run <- m.to.run$model.no
+
+if(length(m.to.run)<2) { m.no <- m.to.run } else { print("create a loop")}
+#m.no <- 4
+
+print (m.no)
 
     # set up folders 
     mp <- mparam[m.no,] #view list of parameters
@@ -76,9 +88,7 @@ m.no <- 2
     ## STILL TO COMPLETE 
     # Random Points: subset the sample data by random point or not 
     #randpt <- as.character(mparam[m.no,"Random.Pt.ID"])
-    #if(randpt == "yes") { 
-    #  pts <- pts %>% dplyr::filter(is.na(Random.Point.ID))} else {
-    #    pts <- pts %>% drop_na( Random.Point.ID) } 
+    #if(randpt == "yes") { pts <- pts %>% dplyr::filter(is.na(Random.Point.ID))} else {pts <- pts %>% drop_na( Random.Point.ID) } 
     
   
     # Field Crew Individuals: subset the sample data by crew = blank = all staff
@@ -125,36 +135,20 @@ m.no <- 2
         pts <- pts } else { 
           pts <- pts %>% filter(str_detect(Site.Realm_5m,TerWet.oi ))}
       
-
+      # status update: 
       print(paste("You have",length(pts$Longitude) ,"samples for this model",sep = " ")) 
 
-       
-## ---------- DECISION 3: Select the scale at which the points were extracted (5m,10m,25m) ---------------------
-      
- 
-      
-#att.files = list.files(in.folder) # this provides a list of the csv files generated with attributes 
-att.files = list.files(path=paste(in.folder,"/"),recursive=TRUE, full.names=FALSE, all.files=TRUE, pattern ="\\_pts_att.csv")
-      
-      
-# need to clean this bit to select the scales (run through a loop)       
-file1 = att.files[2]            # choose the scale of interest (change the # to select a different scale)
+## Select the scale at which the points were extracted (5m,10m,25m)
+m.scale <- as.character(mparam[m.no,"scale"])
 
-#file1 <- select.list(att.files, multiple = TRUE,
-#                             title = "Choose Folder Containing Spatial Files",graphics = TRUE)
+# read in the attribute layer file generted in script 01_extract_pts 
+foi.0 = read.csv(paste(in.folder,paste("Dec_",m.scale,"m_pts_att.csv",sep = ""),sep = "/"),header = TRUE) # read in the file
+foi.0 = foi.0 %>% dplyr::select(-c(X,Longitude,Latitude,ObjectID,ID)) 
 
-scale.analysis = str_sub(gsub("*D_|_pts.*","", file1),start = -3)   # grab the scale to add to summary table
-
-foi.0 = read.csv(paste(in.folder,file1,sep = "/"),header = TRUE) # read in the file
-foi.0 = foi.0 %>%
-  dplyr::select(-c(X,Longitude,Latitude,ObjectID,ID)) 
-
-qdatafn = left_join(pts.t,foi.0, by = "GlobalID") # join the attribute file to the Site series data set (field data)
+qdatafn = left_join(pts,foi.0, by = "GlobalID") # join the attribute file to the Site series data set (field data)
 
 # tidy up the data set 
-qdatafn <- qdatafn %>%
-  mutate (ID = seq(1,length(qdatafn$GlobalID),1)) %>%
-  dplyr::select(-c(GlobalID))
+qdatafn <- qdatafn %>% mutate (ID = seq(1,length(qdatafn$GlobalID),1)) %>% dplyr::select(-c(GlobalID))
 
         # GP Notes to fix error when running model (if using na.omit) If your subset contains 
         #levels(droplevels(qdatafn$SiteSeries))
@@ -162,9 +156,7 @@ qdatafn <- qdatafn %>%
         #groupA <- droplevels(dataset2[dataset2$order=="groupA",])
 
 # create a testing and training data set by random allocation of points 
-# User needs to define the proportion of test/training set 
-
-prop.test=0.2 # change this as needed 
+prop.test <- mparam[m.no,"test.prop"] # select the proportion of testing/training 
 
 get.test(proportion.test=prop.test,
           qdatafn=qdatafn,
@@ -175,161 +167,105 @@ get.test(proportion.test=prop.test,
 
 #qdatafn <- is.matrix(qdatafn)
 
-#get the working directory and assign it to the variable "folder" so we know where to put the results of the analysis
-#this is also the folder that contains the data layers
-
 ###############################################################
 ## SET UP THE MODEL PARAMETERS
 ###############################################################
 
-#In addition to Random Forests, the program will also do a model based on  Stochastic Gradient Boosting
-model.type <-"RF"
+model.type <-"RF"   #In addition to Random Forests, the program will also do a model based on  Stochastic Gradient Boosting
+MODELfn <- paste("M",m.no,sep ="")          # assign model name based on row number of model_param.csv   
+M_description  <- as.character(mparam[m.no,"M.description"]) # assign a model description 
 
-# Give a name for the model that will be used to identify the outputs 
-MODELfn <- "ModelTestingSBBS"
-M_description <-  "TemporaryRuns" #write in a description here as you want "
+#Read in second csv file that Identifies the factors in the csv file that contain data to help predict the individual site series
+m.pred.full <- read.csv("Model_layers.csv",header = TRUE,stringsAsFactors = FALSE)            # read in csv file
+m.pred.full <- m.pred.full %>% dplyr::select(c(Layers,Catergory, paste("M",m.no,sep ="")))    # select corresponding column with model number  #m.pred <-m.pred.full  %>% filter(UQ(as.name(paste("M",m.no,sep =""))) == 1)
+m.pred <-m.pred.full  %>% filter(!!(as.name(paste("M",m.no,sep =""))) == 1)                   # select layers marked with a 1.
 
-#Identify the factors in the csv file that contain data to help predict the individual site series
-predList <- c("AnisotropicHeating",
-              "CHM",
-              "GeneralCurvature",
-              "Dec_dem_BCALbers",
-              "MultiResValleyBottomFlatness",
-              "TWI",
-              "Slope",
-              "Openness_Negative",
-              "Openness_Positive",
-              "TerrainRuggedness",
-              "TopographicPosition",
-              "Biogeoclimatic.Unit",
-              "Li_below2ave",	
-              "Li_below2min",	
-              "Li_below2max",	
-              "Li_demcov",	
-              "Li_p95",
-              "NDVI",
-              "Sen_B01",
-              "Sen_B02",	
-              "Sen_B03",	
-              "Sen_B04",	
-              "Sen_B05",
-              "Sen_B06",
-              "Sen_B07",	
-              "Sen_B08",
-              "Sen_B08A",	
-              "Sen_B09",
-              "Sen_B10",
-              "Sen_B11",
-              "Sen_B12",
-              "Sen_TCI.1",	
-              "Sen_TCI.2",
-              "Sen_TCI.3")
-            
-#If any of the predictors were categorical variables I would identify them with the following command
-#except it would be predFactor <- c("List the variable") - Don't forget the c in front of the first parenthesis
+predList <- m.pred %>% dplyr::filter(Catergory == "Continuous") %>% dplyr::select(Layers)     # filter continuous variables and create a list 
+predList = dplyr::pull(predList,Layers)
 
-predFactor <- ("Biogeoclimatic.Unit")
+# make list of catergorical variables 
+predFactor.full <- m.pred %>% dplyr::filter(Catergory == "Catergorical") %>% dplyr::select(Layers)
+predFactor.full<- c(predFactor.full$Layers)
 
-#predFactor <- FALSE  #I would type this if there were no categorical variables #BGC layer? 
+if (length(predFactor.full) == 0) { predFactor <-  FALSE } else {predFactor <- predFactor.full} # if no catergorical variables predFactor = FALSE
 
-# calcaulte the no of input parameters to be used later on in summary table 
-if (predFactor == FALSE){ length.pred = 0}else { length.pred = length(predFactor) }
-no.params <-length(predList) + length.pred
-
-#Define the response variable and state whether it is binary (present absent 1/0) or continuous or categorical.  These variables match
-#the names I have used in the csv file.
-
-response.name = "Site.Series.Map.Unit_5m" 
-
-#or
-#response.name <- select.list(colnames(pts.t[,5:11]), multiple = FALSE,
-#                             title = "Choose Functional Level",graphics = TRUE)
-
-#qdatafn2 <- qdatafn
+      # calcaulte the no of input parameters to be used later on in summary table 
+      if (predFactor == FALSE){ length.pred = 0} else { length.pred = length(predFactor) }
+      no.params <-length(predList) + length.pred
+      no.params 
+      
+#Define the response variable 
+response.name<- as.character(mparam[m.no,"Response.variable"]) #response.name = "Site.Series.Map.Unit_5m" 
+response.type<- as.character(mparam[m.no,"Response.type"])     #response.type <- "categorical"
 
 ####Optional remove categories with < X training points
 response.number <- count(qdatafn, vars= qdatafn[,c(response.name)] )
-response.good <-response.number[response.number$n >10,] ## set minimum number of training points to allow inclusion of unit
+min.response <-  as.numeric(mparam[m.no,"min.train.points"])
+response.good <-response.number[response.number$n >min.response,]             ## set minimum number of training points to allow inclusion of unit
+
 qdatafn2 <- qdatafn [qdatafn[,c(response.name)] %in% response.good$vars,]
 
-###########sample size calculation for rebalancing (or not)
+###########sample size calculation for rebalancing (or not)       # still to do 
 sampsize <- count(qdatafn2,vars= qdatafn2[,c(response.name)] )
 sampsize <- sampsize$n
-#sampsize = 30
-response.type <- "categorical"
 
-#Not sure what the seed does except starts the model from a given point. Don't change this. 
-seed <- 44
+###############################################################
+## SET UP THE MODEL HYPER-PARAMETERS
+###############################################################
 
-#The csv file must have a unique value for each point-the unique rowname is in column "ID"
-unique.rowname <- "ID"
-#unique.rowname <- "GlobalID"
+seed <- as.numeric(mparam[m.no,"rf.seed"])      #Not sure what the seed does except starts the model from a given point.
 
-#This limits the number of rows that the program reads at a given point so you don't blow up the memory.  I am not sure
-#how much to put here - this is the value they used in the example
-numrows = 400
+unique.rowname <- "ID"  #The csv file must have a unique value for each point-the unique rowname is in column "ID"
 
-#as.data.frame(qdatafn)
-#This identifies the csv file that is a crosswalk table between the predicted factors (elev, slope, etc.) and the names of the
-#raster grids that each one is represented by - you don't need the full path in the name of the file as suggested by the ModelMap pdf file
+numrows = 400 # still to be automated #This limits the number of rows that the program reads at a given point so you don't blow up the memory. untested numbers
 
-#MODEL CREATION
-#This builds the model for the 103 site series using all of the previous information I have typed in above.
-model.obj.ex3 <- model.build(model.type = model.type, 
+n.tree = as.numeric(mparam[m.no,"rf.ntree"])
+
+#MODEL CREATION##
+
+model.obj <- model.build(model.type = model.type, 
                              qdata.trainfn = qdatafn2,
                              folder = model.folder, unique.rowname= unique.rowname, MODELfn = MODELfn, predList = predList,
-                             predFactor = predFactor, response.name = response.name, ntree = 100, sampsize = sampsize,
+                             predFactor = predFactor, response.name = response.name, ntree = n.tree, sampsize = sampsize,
                              response.type = response.type, seed = seed, na.action = "na.roughfix", replace=TRUE)
 
-
 ## Note if you get this error: You need to drop all factors from your subset.  (See code above) 
-      #Error in randomForest.default(x, y, mtry = mtryStart, ntree = ntreeTry,  : 
-      #Can't have empty classes in y.
+ #Error in randomForest.default(x, y, mtry = mtryStart, ntree = ntreeTry,  :  #Can't have empty classes in y.
 ## this is also caused when you use na.omit in the model code as it removes NAs and hence you end up with levels that are misssing in your data set that cant be fixed above/
-##Save output
-print(model.obj.ex3$confusion, digits=2)
-#Novel <-outlier(model.obj.ex3, X1)
-write.csv(model.obj.ex3$confusion[, 'class.error'], file= paste(model.folder,"/",MODELfn,"/", MODELfn,"_Confusion_by_MapUnit.csv",sep=""))
 
-write.csv(model.obj.ex3$proximity, file= paste(model.folder,"/",MODELfn,"/", MODELfn, "_Proximity.csv",sep=""))
-write.csv(model.obj.ex3$importance, file= paste(model.folder,"/",MODELfn,"/",MODELfn, "_Importance.csv",sep=""))
-write.csv(model.obj.ex3$err.rate, file= paste(model.folder,"/",MODELfn,"/",MODELfn, "_Error.csv",sep=""))
-write.csv(model.obj.ex3$confusion, file= paste(model.folder,"/",MODELfn,"/",MODELfn, "_ConfusionMatrix.csv",sep=""))
-VIP <- varImpPlot(model.obj.ex3, sort=TRUE) 
-write.csv(VIP, file= paste(model.folder,"/",MODELfn,"/",MODELfn, "_VariableImport.csv",sep=""))
-#dev.copy(pdf,(paste(model.folder,"/",MODELfn,"/", MODELfn ,'VarImpPlot.pdf')))
-#dev.off()
+
+
+### output metrics to model folder 
+dir.create(model.folder.out<-file.path(model.folder,MODELfn ), showWarnings = TRUE)   # create a folder with the name of the model outputs
+
+write.csv(model.obj$confusion[, 'class.error'], file= paste(model.folder.out,"/", MODELfn,"_Confusion_by_MapUnit.csv",sep=""))
+write.csv(model.obj$proximity, file= paste(model.folder.out,"/", MODELfn, "_Proximity.csv",sep=""))
+write.csv(model.obj$importance, file= paste(model.folder.out,"/",MODELfn, "_Importance.csv",sep=""))
+write.csv(model.obj$err.rate, file= paste(model.folder.out,"/",MODELfn, "_Error.csv",sep=""))
+write.csv(model.obj$confusion, file= paste(model.folder.out,"/",MODELfn, "_ConfusionMatrix.csv",sep=""))
+VIP <- varImpPlot(model.obj, sort=TRUE) 
+write.csv(VIP, file= paste(model.folder.out,"/",MODELfn, "_VariableImport.csv",sep=""))
+# write out pdf plot
+pdf(file=paste(model.folder,"/",MODELfn,"/", MODELfn ,'_VarImpPlot.pdf',sep = ""),width=12,height=8)
+varImpPlot(model.obj, sort=TRUE) 
+dev.off()
+
 
 #MODEL DIAGNOSTICS
-#This generates several diagnostic graphs of the model including Out-Of_bag model predictions including
-#CSv files of presence-absence thresholds optimized by 12 criteria.  It also produces a Variable importance map.
-#It also generates a histogram, calibration plot, a ROC plot and AUC plot and error rate
 
-# create a folder with the name of the model outputs
-
-dir.create(model.folder<-file.path(model.folder,MODELfn ), showWarnings = TRUE)
-
-
-model.pred.ex3 <- model.diagnostics(model.obj = model.obj.ex3,
-                                    qdata.trainfn = qdatafn2, folder = model.folder, MODELfn = MODELfn,
+model.pred. <- model.diagnostics(model.obj = model.obj,
+                                    qdata.trainfn = qdatafn2, folder = model.folder.out, MODELfn = MODELfn,
                                     unique.rowname = unique.rowname, prediction.type = "OOB",
                                     #device.type = c("jpeg", "pdf"), cex = 1.2) # ajust this if you want the outputs in another format 
                                     device.type = "pdf", cex = 1.2)
-
-
-## Note if you get this error: You need to drop all factors from your subset.  
-      #Error in randomForest.default(x, y, mtry = mtryStart, ntree = ntreeTry,  : 
-      #Can't have empty classes in y.
-
 
 ## This line is working only for some catergories
 #model.interaction.plot(model.obj.ex3, x = "GeneralCurvature", y = "TWI", plot.type= "image", device.type = "pdf", MODELfn = MODELfn, folder = model.folder)
 
 
 #MODEL FIT METRICS
-# calculate the confusion matrix 
-pred <- read.table(paste(model.folder,"/",MODELfn,"_pred.csv",sep = ""),header = TRUE, sep = ",", stringsAsFactors = TRUE)
 
+pred <- read.table(paste(model.folder.out,"/",MODELfn,"_pred.csv",sep = ""),header = TRUE, sep = ",", stringsAsFactors = TRUE)
 pred$pred<- as.factor(pred$pred) ; pred$obs<- as.factor(pred$obs)
 sslevels <- unique(c(levels(pred$pred),levels(pred$obs)))
 pred$pred<- factor(pred$pred,levels = sslevels)
@@ -341,6 +277,7 @@ Ave.om = mean(CMX.OMISSION,na.rm = TRUE)
 CMX.COMISION <- 1-(CMX.diag/apply(CMX,1,sum))
 Ave.com = mean(CMX.COMISION,na.rm = TRUE)
 CMX.PCC <- sum(CMX.diag)/sum(CMX)  #Percent Correctly Classified
+
 # estimate Kappa and Kappa (SD)
 CMX.KAPPA <-PresenceAbsence::Kappa(CMX)
 kap = CMX.KAPPA[1,1]; kap.sd = CMX.KAPPA[1,2]
@@ -352,20 +289,9 @@ OM <- tibble::rownames_to_column(OM, "SS")
 OM <-rbind(c("Model",MODELfn,MODELfn),OM)
 #write.csv(OM,paste(model.folder,"/","MODEL_OM_COM.csv",sep = ""),row.names = FALSE) # (add if statement) if running the script from scratch write this line out 
 
-# MAUC # this bit is not quite working yet
-#response = pred$obs
-#response1 = gsub("/",".",response)
-#VOTE = HandTill2001::multcap(response = gsub("/",".",pred$obs),
-#                             predicted = as.matrix(pred[,-c(1,2,3)]))
-#mauc <- HandTill2001::auc(VOTE)
-
-
-
-#model.folder = "Analysis/RandomForest/outputs"
-
 # output the model output by adding a row to a table with all imputs
 sum.data <- read.csv(paste(model.folder,"/","MODEL_OUTPUTS.csv",sep = ""),header = TRUE,stringsAsFactors = FALSE)
-dline = c(MODELfn,M.descrip, no.params,scale.analysis,CMX.PCC,Ave.om,Ave.com,kap,kap.sd)
+dline = c(MODELfn,M_description, no.params,m.scale,CMX.PCC,Ave.om,Ave.com,kap,kap.sd)
 sum.data <- rbind(sum.data,dline)
 write.csv(sum.data,paste(model.folder,"/","MODEL_OUTPUTS.csv",sep = ""),row.names = FALSE)
 
@@ -374,33 +300,28 @@ OM.data <- read.csv(paste(model.folder,"/","MODEL_OM_COM.csv",sep = ""),header =
 OM.data <- left_join(OM.data,OM,by = "SS")  # might need to adjust this one to another join if there is new Site Series classifications
 write.csv(OM.data,paste(model.folder,"/","MODEL_OM_COM.csv",sep = ""),row.names = FALSE)
 
-
 #################################
 # MAP PRODUCTION # produce a map for the current model 
 #################################
-data.folder <- gsub("*D_|_pts.*","", file1)
 
-folder = paste(layer.folder,data.folder,"layers/",sep = "/") # create the filepath where the layers are stored (use the same scale as points extracted from )
-list.files(folder,pattern ="\\.tif$")
+#data.folder <- gsub("*D_|_pts.*","", file1)
 
+layer.folder = paste(layer.folder,"/Dec_",m.scale,"m/","layers/",sep = "") # create the filepath where the layers are stored (use the same scale as points extracted from )
+list.files(layer.folder,pattern ="\\.tif$")
 rastLUTfn <- "ModelMapData_LUT.csv" # need to update this with more layers
 rastLUTfn <- read.table(paste(in.folder,rastLUTfn,sep = "/"),
                         header=FALSE,
                         sep=",",
                         stringsAsFactors=FALSE)
-rastLUTfn[,1] <- paste(folder,rastLUTfn[,1],sep="/")
+rastLUTfn[,1] <- paste(layer.folder,rastLUTfn[,1],sep="")
 
-
-#The function model.mapmake() creates an ascii text files and an imangine image file of predictions for each map pixel.
-
-model.mapmake( model.obj=model.obj.ex3,
-               folder=model.folder,
+model.mapmake(model.obj=model.obj,
+               folder=model.folder.out,
                MODELfn=MODELfn,
                rastLUTfn=rastLUTfn,
                na.action="na.omit")#,
                # Mapping arguments
                #map.sd=TRUE)
-MODELfn
 
 #############################################################
 # Plot 1: 
@@ -409,29 +330,35 @@ c <- seq(0,100,length.out=101)
 col.ramp <- hcl(h = 120, c = c, l = l)
 
 opar <- par(mfrow=c(1,2),mar=c(3,3,2,1),oma=c(0,0,3,4),xpd=NA)
-mapgrid.a <- raster(paste(model.folder,"/",MODELfn,"_map.img",sep=""))
-#mapgrid.b <- raster(paste(model.folder,"/",MODELfn.b,"_map.img",sep=""))
-zlim <- c(0,max(maxValue(mapgrid.a)))
-legend.label<-rev(pretty(zlim,n=23))
+mapgrid.a <- raster(paste(model.folder.out,"/",MODELfn,"_map.img",sep=""))
+zlim <- c(1,max(maxValue(mapgrid.a)))
+
+#legend.label<-rev(pretty(zlim,n=23)) ## OR 
+legend.label<-pretty(zlim,n=23)
+
 legend.colors<-col.ramp[trunc((legend.label/max(legend.label))*100)+1]
+#legend.colors<-heat.colors(max(maxValue(mapgrid.a)),alpha = 1)
+#legend.colors<-diverging_hcl(28)
+#legend.colors<- diverge_hcl(28, h = c(120), c = 80, l = c(80,0))
+#legend.colors<-terrain_hcl(28)
 
-label.doc = read.csv(paste(model.folder,"/",MODELfn,"_map_key.csv",sep = ""))
-category = label.doc$category
-
-legend.label<-paste(legend.label,category,sep="")
 image(mapgrid.a,
       col=col.ramp,
+      #col = legend.colors,
       xlab="",ylab="",xaxt="n",yaxt="n",
       zlim=zlim,
       asp=1,bty="n",main="")
 
-mtext(response.name,side=3,line=1,cex=1.2)
+mtext(paste(MODELfn,": ",response.name,sep = ""),side=3,line=1,cex=1.2) # add a title
+label.doc = read.csv(paste(model.folder.out,"/",MODELfn,"_map_key.csv",sep = ""))
+category = label.doc$category
+legend.label<-paste(legend.label,category,sep="_")
 
-legend( x=xmax(mapgrid.a),y=ymax(mapgrid.a),
+legend(x =xmax(mapgrid.a),y=ymax(mapgrid.a),
         legend=legend.label,
         fill=legend.colors,
         bty="n",
-        cex=1)
+        cex=0.8)
 #mtext("Percent Cover",side=3,line=1,cex=1.5,outer=T)
 par(opar)
 
@@ -439,7 +366,8 @@ par(opar)
 
 #Extract all the locations within the raster and summary 
 freq.ss = data.frame(freq(mapgrid.a))
-freq.ss <- merge(label.doc,freq.ss, by.x = "integercode",by.y ="value" )
+#freq.ss <- merge(label.doc,freq.ss, by.x = "integercode",by.y ="value",all.y = TRUE ) # with NA values 
+freq.ss <- merge(freq.ss,label.doc, by.y = "integercode",by.x ="value" )
 
 # all rasters squares (25m)
 all.locations.25 <- sum(freq.ss$count)  # note this will change on the scale at which the predictions are being made
@@ -452,14 +380,11 @@ freq.ss <-rbind(c("Model",MODELfn,MODELfn),freq.ss)
 
 # if exists statement 
 map.pred <-read.csv(paste(model.folder,"/","MAP_Predict_pc.csv",sep = ""))
-map.pred <- left_join(map.pred,freq.ss,by = "category")
-
-#length(map.pred$category) 
-#length(freq.ss$category)
+map.pred <- left_join(map.pred,freq.ss,by = "category") # NA where not predicted 
 
 write.csv(freq.ss,paste(model.folder,"/","MAP_Predict_pc.csv",sep = ""),row.names = FALSE)
 
-##xx = data.frame(mapgrid.a)
+
 
 
 
