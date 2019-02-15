@@ -1,16 +1,19 @@
-# Extract raster values to point files
-# For Kamloops PEM project - extract attributes to our training and testing points
-# August 2016 - Heather Richardson
-# adjusted for test and training data sets 
+# Extract raster values to point files. 
+# check point values against BGC mapping 
+# Incorporates air interp values and cleans data. # this will require changes once WHM reviews 
+
+# For Deception PEM project - extract attributes to our training and testing points
+
+# Based on origianl script : August 2016 - Heather Richardson
+
+
+# help/Reference files
 
 # http://gis.stackexchange.com/questions/60527/how-to-extract-values-from-rasters-at-location-of-points-in-r
 # https://www.r-bloggers.com/extract-values-from-numerous-rasters-in-less-time/
 ###################################################################################################################
 
 ### Step 1). Load packages and set up libraries: 
-
-# note this only needs to be run once
-# install.packages(c("raster","rgdal","RSAGA", "tidyr","dplyr")
 
 library(tidyr)
 library(raster)
@@ -19,176 +22,168 @@ library(sp)
 library(rgdal)
 library(sf)
 library(ggplot2)
-library(Vectorize)
+library(dplyr)
+library(gtools)
+#library(Vectorize)
 
-## check the home directory  
-#getwd()
+## ## set up location of drives to input and output
+setwd("D:/PEM_DATA/")#check the home directory  # set up work directory 
 
-## set up location of drives to input and output
+field.data.folder = ("Data/Field_data")         # point to field data   #field.data.folder = ("C:/PEM_DATA/Data/Field_data/")
+input.folder = ("Data/Layers")                  # point to where layers are stored  #list.files(input.folder) #input.folder = ("C:/PEM_DATA/Data/Layers/")
+out.folder = ("Analysis/RandomForest/inputs")   # Point to where your random forest outputs will be stored
+ss.folder = ("Data/Deception_ss/")        
+pem.gdb = ("Data/Deception_ss/Pem.gdb") # contains 
 
-field.data.folder = ("../../Data/Field_data")
-#field.data.folder = ("C:/PEM_DATA/Data/Field_data/")
 
-input.folder = ("../../Data/Layers") #list.files(input.folder)
-#input.folder = ("C:/PEM_DATA/Data/Layers/")
-
-out.folder = ("../../Analysis/RandomForest/inputs")
-
-ss.folder = ("../../Data/Deception_ss/")
-pem.gdb = "C:/PEM_DATA/Data/Deception_ss/Pem.gdb" # contains 
 #### Step 2) Select pt data you want to use. 
 
-# enter points file.
-# note need to combine the Old file with the latest file. Note these have different fields and need to be treated differently then combined. 
-
-#pts.file = "AllDeception_Pts_Consolidated_to_July13.csv"
-pts.file ="AllDeception_Pts_Consolidated_to_2018-09-23.csv"
+pts.file ="AllDeception_Pts_Consolidated_WHM.csv"
 
 ## or manually choose file: 
 #pts.file  <- file.choose() 
 
+#### Read in Air-interp points and format to match points 
+air.0 <- st_read(paste(field.data.folder,"Deception Lake.shp",sep = "/"))
+air.0 <- st_transform(air.0,3005)
+air <- as.data.frame(air.0)
+airxy <- as.data.frame(st_coordinates(air.0)) 
+air <- cbind(air,airxy)
+
+# adjust air interp photos
+# reclass anything Am as Xvh and anything that is Gb as Xvs.
+#I will need to look at each individual point to confirm but we can go with this for now.
+
+# GP notes 
+# convert realm to wetland and terrestrial 
+# Convert group to G/A??R/W 
+# convert Physio to NFor????? leave for Will 
+
+# not likely to allocate air interp to more than CLass
+# aim to allocate forest to SS and NoFor to Class. 
+
+#head(air)
+air <- air %>% mutate(Site.Physiog_5m = "Nfor"  ) # temp fix - WHM to review      
+air <- air %>% mutate(Site.Realm_5m = ifelse(Realm == "Wetland","Wetland","Terrestral"))  # convert to terrestiral and wetland
+air <- air %>% mutate(Site.Group_5m = ifelse(Realm == "Wetland","W",
+                                             ifelse(Realm == "Alpine","A",
+                                                    ifelse(Realm == "Rock","R",
+                                                           ifelse(Realm == "Grassland","G",NA)))))                 
+air <- air %>% mutate(Site.Class_5m = Class )               
+air <- air %>% mutate(Site.Class_5m = ifelse(Class == "Am","Xvh",
+                                             ifelse(Class == "Gb","Xvs",paste(Site.Class_5m))))                
+#unique(air$Class)
+#unique(air$Site.Class_5m) 
+air <- air %>% mutate(Comment..max.255.characters = "Comments") 
+air <- air %>% mutate(Air.Interp = "Yes", GlobalID = paste("Air_",Point_NBR,sep = "" )) 
+air <- air %>% dplyr::select(-c("Comments", "geometry","Id","Point_NBR","Realm", "Class", "Assoc"))
+
 ###########################################################
 # Step 1:  open points file and extract Lats and Longs
 ###########################################################
-
 pts = read.csv(paste(field.data.folder,"/",pts.file,sep = ''),stringsAsFactors = FALSE)
+pts = pts %>% dplyr::select(-X)
 
-## check the files for errors
-# problem with Dates that might need to be fixed 
-#unique(pts$Date) ; range(pts$Date)
+pts.sf = st_as_sf(pts, coords = c("Longitude","Latitude")) # read in as sf object
+st_crs(pts.sf) = 4326   # assign a CRS based on data collection 
+pts.BC = st_transform(pts.sf,3005) # convert CRS to BC albers
+pts.BC = as.data.frame(cbind(pts.BC,st_coordinates(pts.BC))) 
+pts.BC = pts.BC %>% dplyr::select(-geometry)
+#ggplot(pts.BC) + geom_sf(data = pts.BC, colour = "red", fill = NA)
 
-# extract the Lat/Longs. 
-LatLon <- pts %>% dplyr::select(c(Longitude,Latitude,ObjectID,GlobalID))
-LatLon <- na.omit(LatLon)
+pts.all <- smartbind(pts.BC,air) # join air interp to other field data
+#length(air$X); length(pts.BC$X) ; length(pts.all$ObjectID)  ## error check the details. 
 
-#length(LatLon$Longitude) # check the length of the files
-# check type of files: 
-#str(LatLon)
+LatLon <- pts.all %>% dplyr::select(c(X,Y,GlobalID))     # extract the Lat/Longs. 
+coordinates(LatLon)=~X + Y
+proj4string(LatLon)=CRS("+init=epsg:3005") # set it to lat-long
 
-# get co-ordinates and convert from WGs to albers to match the base layers
-coordinates(LatLon)=~Longitude + Latitude
-proj4string(LatLon)=CRS("+init=epsg:4326") # set it to lat-long
-pts = spTransform(LatLon,CRS("+init=epsg:3005"))
+pts.sp = cbind(LatLon,coordinates(LatLon))
 
-plot(pts)
 
-###################################################################
-#### Step 2) Select layers you want to extract by data you want to use. 
-###################################################################
-
+###########################################################################
 # list contains all raster files we want to extract the attributes from. 
-
 layers.list = as.list(list.dirs(input.folder,full.names=TRUE))
 
 # create a list of layer files to use 
-LOI = c(layers.list[3],layers.list[6],layers.list[8])
-
-##or single folder 
-#i  = "../../Data/Layers/Dec_North_25m/layers/"
+LOI = c(layers.list[16],layers.list[3] )#,layers.list[18])#,layers.list[4])
 
 # loop through all data folders/data sets to generate the csv attribute files for 5,10,25m scales. 
 
 for(ii in 1:length(LOI)) { 
-    #ii = 2
-    i = LOI[ii]
-    i.name = gsub(input.folder,"",paste(i))
-    i.name = gsub("/layers","",i.name)
-    i.scale = gsub("Dec_North_","",i.name)
-    
-    ## check the list of rasters to extract from: 
-    #f <- list.files(path=paste(i),recursive=TRUE, full.names=TRUE, all.files=TRUE, pattern ='.tif$')
-    Covariates <-  list.files(path= paste(i),recursive=TRUE, full.names=TRUE, all.files=TRUE, pattern ="\\.tif$")
-    Covariates <-  stack(Covariates)
-    proj4string(Covariates) <- CRS("+init=epsg:3005") 
-    #prs <- "+proj=aea +lat_1=50 +lat_2=58.5 +lat_0=45 +lon_0=-126 +x_0=1000000 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
-    #pr1 <- projectRaster(Covariates,crs = prs)
-    # http://spatialreference.org/ref/    Albers BC is espg:3005+proj=aea +lat_1=50 +lat_2=58.5 +lat_0=45 +lon_0=-126 +x_0=1000000 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0 
-    attributes <- raster::extract(Covariates, coordinates(pts), df=TRUE)
-    attributes <- as.data.frame(attributes)
-    LatLon <- as.data.frame(LatLon)
-    training <- cbind(LatLon,attributes)
-    training$scale = paste(i.scale)
-    
-    write.csv(training, paste(out.folder,"/",i.name,"_pts_att.csv", sep=""))
-                    }
+  ii = 2
+  i = LOI[ii]
+  i.name = gsub(input.folder,"",paste(i))
+  i.name = gsub("/layers","",i.name)
+  i.scale = gsub("/Dec_","",i.name)
+  
+  Covariates <-  list.files(path= paste(i),recursive=TRUE, full.names=TRUE, all.files=TRUE, pattern ="\\.tif$")
+  Covariates <-  stack(Covariates) #,quick = TRUE)
+  #plot(Covariates)
+  
+  proj4string(Covariates) <- CRS("+init=epsg:3005")   # http://spatialreference.org/ref/    Albers BC is espg:3005+proj=aea +lat_1=50 +lat_2=58.5 +lat_0=45 +lon_0=-126 +x_0=1000000 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0 
+  attributes <- raster::extract(Covariates, coordinates(pts.sp), df=TRUE)
+  attributes <- as.data.frame(attributes)
+  
+  LatLon <- as.data.frame(LatLon)
+  #pts.sp <- as.data.frame(pts.sp)
+  training <- cbind(LatLon,attributes)
+  training$scale = paste(i.scale)
+  write.csv(training, paste(out.folder,i.name,"_pts_att.csv", sep=""))
+}
 
 
 ################################################################################
 # Step 3: Insersect BGC layer with pts data and add new field.
 
-pts.0 = read.csv(paste(field.data.folder,"/",pts.file,sep = ''),stringsAsFactors = FALSE)
-pts.sub = pts.0 %>% dplyr::select(c( Longitude, Latitude,GlobalID,Biogeoclimatic.Unit,Site.Series.Map.Unit_5m))
+pts.sub = pts.all
+#pts.sub = pts.all %>% dplyr::select(c( X, Y,GlobalID,Biogeoclimatic.Unit))
 
 # using sf 
-pts.sf = st_as_sf(pts.sub, coords = c("Longitude","Latitude")) # read in as sf object
-st_crs(pts.sf) = 4326   # assign a CRS based on data collection 
-pts.BC = st_transform(pts.sf,3005) # convert CRS to BC albers
-#ggplot(pts.BC) + geom_sf(data = pts.BC, colour = "red", fill = NA)
+pts.sf = st_as_sf(pts.sub, coords = c("X","Y")) # read in as sf object
+st_crs(pts.sf) = 3005   # assign a CRS based on data collection 
 
 # read in BGC layer (created previously in ArcMap)
 ## Set your input geodatabases ## edit these to your filepath and name of gdb
 subset(ogrDrivers(), grepl("GDB", name))
 sslist <- ogrListLayers(pem.gdb); print(sslist)
 
-BGC.0 = st_read(dsn = pem.gdb,layer = "BEC_AOI") # read in the layer of interest
-BGC.0 = BGC.0 %>% dplyr::select(c(MAP_LABEL,BGC_LABEL)) ; head(BGC.0)
-## plot the results
-#plot(st_geometry(pts.BC))
+BGC.0 = st_read(dsn = pem.gdb,layer = "BEC_WL_AOI") # read in the layer of interest
+BGC.0 = BGC.0 %>% dplyr::select(c(MAP_LABEL)) ; head(BGC.0)
+
+## plot the results: 
+#plot(st_geometry(pts.sf),col = "red")
 #plot(st_geometry(BGC.0),add =  T)
 
 # intersect the points with the mapped BGC units
-pts.int = st_intersection(pts.BC,BGC.0)   # intersect with ranges
-pts.int.df = data.frame(pts.int)
+pts.int <- st_intersection(pts.sf,BGC.0)   # intersect with ranges # this may take some time
+pts.int.df <- data.frame(pts.int)
+pts.int.df <- cbind(pts.int.df,st_coordinates(pts.int))
+
 pts.int.df <- pts.int.df %>% dplyr::select(-(geometry))
 #head(pts.int.df)
-#head(pts.0)  
+pts.out <- pts.int.df
 
-pts.out = dplyr::left_join(pts.0,pts.int.df)
-pts.out <- pts.out %>% dplyr::select(-(X))# remove X columns 
-pts.out$BGC_test <- mapply(grepl, pattern=pts.out$Biogeoclimatic.Unit, x=pts.out$MAP_LABEL)
+# check if the called BGC is the same as the mapped BGC if the same = 0, if different = 1.
+pts.out$BGC_test <- mapply(grepl,pattern=pts.out$Biogeoclimatic.Unit, x=pts.out$MAP_LABEL)
 
-# Formatting crew names and other error checking 
-pts.out$Crew
+#test<- pts.out %>% group_by(Biogeoclimatic.Unit) %>% summarise(count = n()) ; test
 
-head(pts.out)
-string
+air <- pts.out %>% dplyr::filter(Air.Interp == "Yes")
+non.air <- pts.out %>% dplyr::filter(is.na(Air.Interp))
 
-pts.out =  pts.out %>% 
-        mutate(Crew = toupper(trimws(Crew, which= "both"))) %>%
-        mutate(Crew = gsub(". ",",",Crew))%>%
-        mutate(Crew = gsub(",,",",",Crew))
-unique(pts.out$Crew) 
+# update the BGC for the air interp: 
+air <- air%>% mutate(Biogeoclimatic.Unit = MAP_LABEL)
+pts.out = rbind(non.air,air)   # ; length(pts.out$ObjectID)
 
+#test<- pts.out %>% group_by(Biogeoclimatic.Unit) %>% summarise(count = n()) ; test
+#unique(pts.out$Air.Interp)        
 
-pts.file.out = "AllDeception_Pts_Consolidated_to_2018-09-23_BGC.csv"
+pts.file.out = "AllDeception_Pts_Consolidated_WHM_BGC_Air.csv"
 
 write.csv(pts.out,paste(field.data.folder,"/",pts.file.out,sep = ''))
 
 
 
-
-
-
-
-
-
-
-
-
-
-### OLD STUFF #####
-
-#for(i in 1:length(f)){
-
-#	pr <- raster(f[i])
-#	# extract raster values at specified coordinates
-#	attributes <- extract(pr, coordinates(pts), df=TRUE)
-	# transpose attributes in data frame. The write function only writes in rows (top to bottom)
-#	attributes <- t(attributes)
-	# write(x, i) appends data x to file i. 
-#	write(attributes, file="E:\\RandomForest_Deception\\AllDeception_Pts_att.csv", sep=",", append=a, ncol=length(attributes))
-#	a=TRUE
-#}
-#list.files(path="U:\\Heather_Richardson\\All_Cleaned_Layers\\", full.names=FALSE, pattern='.asc')
 
 
