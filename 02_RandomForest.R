@@ -1,19 +1,19 @@
 # Script 2: Run the random forest models based on subset of selected variables: 
 
-# Note :  this script relies on setting up model inputs in advance. This includes
-#   1) Model_param.csv = a csv which lists all the input parameters and model perameters
-#   2) Model_layers.csv = a csv which lists each model and the layers to be in[put for each model run. 
+# HOW TO RUN THIS SCRIPT:
+# 1) set up model parameters in the accompanying xlxs sheet
+# 2) ensure you have run script 1: 01_extract_pt_values.R
 
-# note the row number of model.no is 4 == the corresponding M4 in the Model_layers.csv 
+
 
 ## Install packages and check libraries;  # note this only needs to be run once
 #install.packages(c("raster","rgdal","RSAGA", "tidyr","dplyr", "ModelMap","randomforest",dep = T)) 
 
-# note if having problems loading the xlsx package or rJava package see here:
-#https://www.r-statistics.com/2012/08/how-to-load-the-rjava-package-after-the-error-java_home-cannot-be-determined-from-the-registry/
-#https://stackoverflow.com/questions/2399027/cannot-load-rjava-because-cannot-load-a-shared-library
-#Sys.setenv(JAVA_HOME='C:\\Program Files (x86)\\Java\\jre1.8.0_181\\bin') # for 32-bit version
-#Sys.setenv(JAVA_HOME='C:\\Program Files\\Java\\jre1.8.0_201\\') # for 64-bit version
+    # note if having problems loading the xlsx package or rJava package see here:
+    #https://www.r-statistics.com/2012/08/how-to-load-the-rjava-package-after-the-error-java_home-cannot-be-determined-from-the-registry/
+    #https://stackoverflow.com/questions/2399027/cannot-load-rjava-because-cannot-load-a-shared-library
+    #Sys.setenv(JAVA_HOME='C:\\Program Files (x86)\\Java\\jre1.8.0_181\\bin') # for 32-bit version
+    #Sys.setenv(JAVA_HOME='C:\\Program Files\\Java\\jre1.8.0_201\\') # for 64-bit version
 
 #.libPaths("E:/R packages351") # specify the location of libraries is not using default.
 

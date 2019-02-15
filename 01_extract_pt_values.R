@@ -4,15 +4,22 @@
 
 # For Deception PEM project - extract attributes to our training and testing points
 
-# Based on origianl script : August 2016 - Heather Richardson
+# Based on original script : August 2016 - Heather Richardson
 
 
 # help/Reference files
 
 # http://gis.stackexchange.com/questions/60527/how-to-extract-values-from-rasters-at-location-of-points-in-r
 # https://www.r-bloggers.com/extract-values-from-numerous-rasters-in-less-time/
-###################################################################################################################
 
+###################################################################################################################
+# To run this script you will need: 
+# - Training points data 
+# - Air interp data
+# - BGC layer 
+# - Layer with attributes you want to extract
+
+###################################################################################################################
 ### Step 1). Load packages and set up libraries: 
 
 library(tidyr)
@@ -24,7 +31,6 @@ library(sf)
 library(ggplot2)
 library(dplyr)
 library(gtools)
-#library(Vectorize)
 
 ## ## set up location of drives to input and output
 setwd("D:/PEM_DATA/")#check the home directory  # set up work directory 
