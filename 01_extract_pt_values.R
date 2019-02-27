@@ -41,7 +41,6 @@ out.folder = ("Analysis/RandomForest/inputs")   # Point to where your random for
 ss.folder = ("Data/Deception_ss/")        
 pem.gdb = ("Data/Deception_ss/Pem.gdb") # contains 
 
-
 #### Step 2) Select pt data you want to use. 
 
 pts.file ="AllDeception_Pts_Consolidated_WHM.csv"
@@ -54,7 +53,11 @@ air.0 <- st_read(paste(field.data.folder,"Deception Lake.shp",sep = "/"))
 air.0 <- st_transform(air.0,3005)
 air <- as.data.frame(air.0)
 airxy <- as.data.frame(st_coordinates(air.0)) 
-air <- cbind(air,airxy)
+air <- cbind(air,airxy)  
+#length(air$X)
+air <- air %>% dplyr::filter(X >0)
+#length(air$X)
+
 
 # adjust air interp photos
 # reclass anything Am as Xvh and anything that is Gb as Xvs.
@@ -70,7 +73,7 @@ air <- cbind(air,airxy)
 
 #head(air)
 air <- air %>% mutate(Site.Physiog_5m = "Nfor"  ) # temp fix - WHM to review      
-air <- air %>% mutate(Site.Realm_5m = ifelse(Realm == "Wetland","Wetland","Terrestral"))  # convert to terrestiral and wetland
+air <- air %>% mutate(Site.Realm_5m = ifelse(Realm == "Wetland","Wetland","Terrestrial"))  # convert to terrestiral and wetland
 air <- air %>% mutate(Site.Group_5m = ifelse(Realm == "Wetland","W",
                                              ifelse(Realm == "Alpine","A",
                                                     ifelse(Realm == "Rock","R",
@@ -84,28 +87,31 @@ air <- air %>% mutate(Comment..max.255.characters = "Comments")
 air <- air %>% mutate(Air.Interp = "Yes", GlobalID = paste("Air_",Point_NBR,sep = "" )) 
 air <- air %>% dplyr::select(-c("Comments", "geometry","Id","Point_NBR","Realm", "Class", "Assoc"))
 
+#air.sf = st_as_sf(air, coords = c("X","Y")) # read in as sf object
+#st_crs(air.sf) = 3005 
+
 ###########################################################
 # Step 1:  open points file and extract Lats and Longs
 ###########################################################
 pts = read.csv(paste(field.data.folder,"/",pts.file,sep = ''),stringsAsFactors = FALSE)
 pts = pts %>% dplyr::select(-X)
-
 pts.sf = st_as_sf(pts, coords = c("Longitude","Latitude")) # read in as sf object
 st_crs(pts.sf) = 4326   # assign a CRS based on data collection 
 pts.BC = st_transform(pts.sf,3005) # convert CRS to BC albers
-pts.BC = as.data.frame(cbind(pts.BC,st_coordinates(pts.BC))) 
+pts.BC = as.data.frame(cbind(pts.BC,st_coordinates(pts.BC))) #,st_coordinates(pts.sf))) 
 pts.BC = pts.BC %>% dplyr::select(-geometry)
 #ggplot(pts.BC) + geom_sf(data = pts.BC, colour = "red", fill = NA)
+
 
 pts.all <- smartbind(pts.BC,air) # join air interp to other field data
 #length(air$X); length(pts.BC$X) ; length(pts.all$ObjectID)  ## error check the details. 
 
+row.names(pts.all)<-NULL 
 LatLon <- pts.all %>% dplyr::select(c(X,Y,GlobalID))     # extract the Lat/Longs. 
 coordinates(LatLon)=~X + Y
 proj4string(LatLon)=CRS("+init=epsg:3005") # set it to lat-long
 
 pts.sp = cbind(LatLon,coordinates(LatLon))
-
 
 ###########################################################################
 # list contains all raster files we want to extract the attributes from. 
@@ -117,7 +123,7 @@ LOI = c(layers.list[16],layers.list[3] )#,layers.list[18])#,layers.list[4])
 # loop through all data folders/data sets to generate the csv attribute files for 5,10,25m scales. 
 
 for(ii in 1:length(LOI)) { 
-  ii = 2
+  #ii = 1
   i = LOI[ii]
   i.name = gsub(input.folder,"",paste(i))
   i.name = gsub("/layers","",i.name)
@@ -135,6 +141,7 @@ for(ii in 1:length(LOI)) {
   #pts.sp <- as.data.frame(pts.sp)
   training <- cbind(LatLon,attributes)
   training$scale = paste(i.scale)
+  rownames(training) <- NULL
   write.csv(training, paste(out.folder,i.name,"_pts_att.csv", sep=""))
 }
 
@@ -142,11 +149,8 @@ for(ii in 1:length(LOI)) {
 ################################################################################
 # Step 3: Insersect BGC layer with pts data and add new field.
 
-pts.sub = pts.all
-#pts.sub = pts.all %>% dplyr::select(c( X, Y,GlobalID,Biogeoclimatic.Unit))
-
 # using sf 
-pts.sf = st_as_sf(pts.sub, coords = c("X","Y")) # read in as sf object
+pts.sf = st_as_sf(pts.all, coords = c("X","Y")) # read in as sf object
 st_crs(pts.sf) = 3005   # assign a CRS based on data collection 
 
 # read in BGC layer (created previously in ArcMap)
@@ -166,15 +170,14 @@ pts.int <- st_intersection(pts.sf,BGC.0)   # intersect with ranges # this may ta
 pts.int.df <- data.frame(pts.int)
 pts.int.df <- cbind(pts.int.df,st_coordinates(pts.int))
 
-pts.int.df <- pts.int.df %>% dplyr::select(-(geometry))
-#head(pts.int.df)
+pts.int.df <- pts.int.df %>% dplyr::select(-(geometry)) #; #head(pts.int.df)
 pts.out <- pts.int.df
 
 # check if the called BGC is the same as the mapped BGC if the same = 0, if different = 1.
 pts.out$BGC_test <- mapply(grepl,pattern=pts.out$Biogeoclimatic.Unit, x=pts.out$MAP_LABEL)
-
 #test<- pts.out %>% group_by(Biogeoclimatic.Unit) %>% summarise(count = n()) ; test
 
+# update the BGC for the air interp values (as this currently doesn not have one)
 air <- pts.out %>% dplyr::filter(Air.Interp == "Yes")
 non.air <- pts.out %>% dplyr::filter(is.na(Air.Interp))
 
@@ -189,7 +192,26 @@ pts.file.out = "AllDeception_Pts_Consolidated_WHM_BGC_Air.csv"
 
 write.csv(pts.out,paste(field.data.folder,"/",pts.file.out,sep = ''))
 
+########################################################################################
 
+## Set up the empty tables to write to 
+
+## may adjust this to excel version at some point in the future.....
+
+
+
+## The first time you run this script you need to generate blank tables for each level of response to aggregate resulst summary
+## this is to set up table which will house the summary data 
+## NOTE : only need to do this ONCE! before running models; 
+
+## Responses 
+#response.file <- c("Biogeoclimatic.Unit","Site.Physiog_5m","Site.Realm_5m","Site.Group_5m") #,"Site.Class_5m","Site.Series.Map.Unit_5m")
+#for ( i in 1:length(response.file)){
+#  #i = 1
+#  temp.res = response.file[i]
+#  temp.data = as.data.frame(unique(pts.0[[paste(temp.res)]])); colnames(temp.data)<-paste(temp.res)
+#  write.csv(temp.data, file= paste(model.folder,"/",temp.res,"_prop.correct.csv",sep=""),row.names = FALSE)
+#             }
 
 
 
