@@ -52,7 +52,7 @@ mmu <- read.xlsx("Model_params.xlsx","Model_MapUnit",header = TRUE,colClasses = 
 m.to.run <- mparam %>% dplyr::select(To.Run,model.no) %>% dplyr::filter(To.Run == 1) # make a listof models to run
 m.to.run <- m.to.run$model.no 
 
-m.to.run <- 28; m.no <- m.to.run # tester line
+m.to.run <- 33; m.no <- m.to.run # tester line
 
 if(length(m.to.run)<2) { 
   m.no <- m.to.run } else { 
@@ -92,13 +92,11 @@ if(length(m.to.run)<2) {
   # - Site.Var.Phase.Map.Unit_5m
   
   # split out forested SBSmc2 forested
-  pts<- pts %>% dplyr::filter(Biogeoclimatic.Unit == "SBSmc2")
-  pts<- pts %>% dplyr::filter(Site.Physiog_5m == "Forest")
+  #pts<- pts %>% dplyr::filter(Biogeoclimatic.Unit == "SBSmc2")
+  #pts<- pts %>% dplyr::filter(Site.Physiog_5m == "Forest")
   
   # split out forested SBSmc2 forested
-  #pts<- pts %>% dplyr::filter(Site.Physiog_5m == "NoForest")
-  
-  
+  pts<- pts %>% dplyr::filter(Site.Physiog_5m == "Nfor")
   
   
   #############################################3    
@@ -188,6 +186,8 @@ if(length(m.to.run)<2) {
   # remove any rows where the response variable is zero    
   pts <- pts %>% dplyr::filter(response.name != "") # remove rows with no site series data
   length(pts$X)
+  pts <- pts %>% dplyr::filter(Site.Class_5m !== "?") # remove rows with no site series data
+  length(pts$X)
   pts<- pts %>% drop_na(response.name)
   length(pts$X)
   
@@ -202,47 +202,56 @@ if(length(m.to.run)<2) {
   ## Balancing the sample design
   # get a summary of the points 
   pts.sum <- pts %>%
-    group_by(Site.Series.Map.Unit_5m) %>%
+   # group_by(Site.Series.Map.Unit_5m) %>%
+    group_by(Site.Class_5m) %>%
     summarise(count = n()) 
   median(pts.sum$count)
   
   pts.sum = as.data.frame(pts.sum)
-    ggplot(pts.sum,aes(Site.Series.Map.Unit_5m,count))+
-    geom_bar(stat = "identity")  
-   # ggsave(paste(m.summary.output.folder,"ss.count.jpeg",sep = ""),width = 30, height = 20, units = "cm")
+  
+  #ggplot(pts.sum,aes(Site.Series.Map.Unit_5m,count))+
+  ggplot(pts.sum,aes(Site.Class_5m,count))+ 
+  geom_bar(stat = "identity")  
+  ggsave("sc.count.jpeg",sep = ""),width = 30, height = 20, units = "cm")
   
   # STILL TO Automate 
   # Balanced design of 50 or more 
-  pts.over.50 <- pts.sum %>% dplyr::filter(count > 29) ;
-  pts.over.50 <- pts.over.50[,'Site.Series.Map.Unit_5m']
+  pts.over.50 <- pts.sum %>% dplyr::filter(count >50) ;
+  #pts.over.50 <- pts.over.50[,'Site.Series.Map.Unit_5m']
+  pts.over.50 <- pts.over.50[,'Site.Class_5m']
   #pts.o50 <- pts %>% dplyr::filter(Site.Var.Phase.Map.Unit_5m %in% pts.over.50)
   #SBSmc2/01 SBSmc2/05 SBSmc2/06 SBSmc2/10 
-  
+  #Wb Wf Ws
   #pts.sum <- pts.o50  %>%
   #  group_by(Site.Series.Map.Unit_5m) %>%
   #  summarise(count = n())
   
-  pts.o501 <- pts  %>% dplyr::filter(Site.Var.Phase.Map.Unit_5m == "SBSmc2/01")
-  pts.o501 <-sample_n(pts.o501, 29, replace = FALSE)
+  #pts.o501 <- pts  %>% dplyr::filter(Site.Var.Phase.Map.Unit_5m == "SBSmc2/01")
+  pts.o501 <- pts  %>% dplyr::filter(Site.Class_5m == "Wb")
+  pts.o501 <-sample_n(pts.o501, 50, replace = FALSE)
   
-  pts.o502 <- pts  %>% dplyr::filter(Site.Var.Phase.Map.Unit_5m == "SBSmc2/05")
-  pts.o502 <-sample_n(pts.o502, 29, replace = FALSE)
+  #pts.o502 <- pts  %>% dplyr::filter(Site.Var.Phase.Map.Unit_5m == "SBSmc2/05")
+  pts.o502 <- pts  %>% dplyr::filter(Site.Class_5m == "Wf")
+  pts.o502 <-sample_n(pts.o502, 50, replace = FALSE)
   pts.o50all <- rbind(pts.o501,pts.o502)
   
-  pts.o503 <- pts  %>% dplyr::filter(Site.Var.Phase.Map.Unit_5m == "SBSmc2/06")
-  pts.o503 <-sample_n(pts.o503, 29, replace = FALSE)
+  #pts.o503 <- pts  %>% dplyr::filter(Site.Var.Phase.Map.Unit_5m == "SBSmc2/06")
+  pts.o503 <- pts  %>% dplyr::filter(Site.Class_5m == "Ws")
+  pts.o503 <-sample_n(pts.o503, 50, replace = FALSE)
   pts.o50all <- rbind(pts.o50all,pts.o503)
   
-  pts.o504 <- pts %>% dplyr::filter(Site.Var.Phase.Map.Unit_5m == "SBSmc2/10") # possible error here with different values
-  pts.o504 <-sample_n(pts.o504, 29, replace = FALSE)
-  pts.o50all <- rbind(pts.o50all,pts.o504)
+  #pts.o504 <- pts %>% dplyr::filter(Site.Var.Phase.Map.Unit_5m == "SBSmc2/10") # possible error here with different values
+  #pts.o504 <-sample_n(pts.o504, 29, replace = FALSE)
+  #pts.o50all <- rbind(pts.o50all,pts.o504)
   
-  pts.under.50 <- pts.sum %>% filter(count < 29) 
-  pts.under.50 <- pts.under.50[,'Site.Series.Map.Unit_5m']
-  pts.u50 <- pts %>% dplyr::filter(Site.Var.Phase.Map.Unit_5m %in% pts.under.50)
-  
+  pts.under.50 <- pts.sum %>% filter(count < 50) 
+  #pts.over.50 <- pts.over.50[,'Site.Class_5m']
+  #pts.under.50 <- pts.under.50[,'Site.Series.Map.Unit_5m']
+  #pts.u50 <- pts %>% dplyr::filter(Site.Series.Map.Unit_5m %in% pts.under.50)
+  pts.u50 <- pts %>% dplyr::filter(Site.Class_5m %in% pts.under.50)
   pts.all<- rbind(pts.o50all,pts.u50)
   pts.sum <- pts.all  %>%
+    group_by(Site.Class_5m) %>%
     group_by(Site.Series.Map.Unit_5m) %>%
     summarise(count = n()); pts.sum 
  
