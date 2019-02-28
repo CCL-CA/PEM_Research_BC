@@ -37,29 +37,34 @@ m.summary.output.folder = "D:/PEM_DATA/Analysis/RandomForest/outputs/Model_compa
     prop.cor <- prop.cor %>% gather(prop.cor, "Model",2:length(prop.cor))
     prop.cor<- prop.cor %>% mutate(Model.no = str_remove(prop.cor,"_prop.correct"))
     
+    # if you want to plot only some models
+    mlist = c("M28","M29")
+    prop.cor <- prop.cor %>% dplyr::filter(Model.no %in% mlist)
+    prop.cor <- prop.cor %>% drop_na(Model)
+    
     plot.all.ss <- prop.cor %>%
       ggplot(aes(x=Model.no, y=Model)) + 
       geom_boxplot() +
-      geom_jitter(size=1, position=position_jitter(width=0.2, height=0.0001)) +
+      geom_jitter(size=3, position=position_jitter(width=0.04, height=0.0001)) +
       xlab("Models") + 
       scale_y_continuous(limits = c(0,1))+ 
-      ylab("Site Series (prop. correctly assigned)")
+      ylab("Site Series (prop. correctly assigned)")+
       ggtitle("Proportion of correctly assigned site series per model")
     plot.all.ss
-    ggsave(paste(m.summary.output.folder,"m.prop.correct.ss.pdf",sep = ""),width = 20, height = 20, units = "cm")
+    ggsave(paste(m.summary.output.folder,"m.prop.correct.ss.jpeg",sep = ""),width = 20, height = 20, units = "cm")
     
     plot.by.ss <- prop.cor %>%
       ggplot(aes(x=Site.Series.Map.Unit_5m , y=Model,col = Model.no)) + 
-      geom_point()  + 
+      geom_point(size = 3)  + 
       #geom_line(aes(x=Site.Series.Map.Unit_5m , y=Model))+
-      geom_jitter(size=1, position=position_jitter(width=0.2, height=0.0001)) +
+      #geom_jitter(size=1, position=position_jitter(width=0.2, height=0.0001)) +
       xlab("Models") + 
       ylab("Site Series(prop. correctly assigned)")+
       ggtitle("Correctly assigned Site Series by model")+
       scale_y_continuous(limits = c(0,1))+ 
       theme(axis.text.x = element_text(angle = 90))
     plot.by.ss     
-    ggsave(paste(m.summary.output.folder,"m.correct.ss.pdf",sep = ""),width = 30, height = 20, units = "cm")
+    ggsave(paste(m.summary.output.folder,"m.correct.ss.jpeg",sep = ""),width = 30, height = 20, units = "cm")
 
 
 #### Site Physiology ####
@@ -77,7 +82,7 @@ m.summary.output.folder = "D:/PEM_DATA/Analysis/RandomForest/outputs/Model_compa
         ggtitle("Proportion of correctly assigned Site physiology (Forest/Non Forest) per model")+
         scale_y_continuous(limits = c(0,1))
       plot.all.sp
-      ggsave(paste(m.summary.output.folder,"m.prop.correct.sp.pdf",sep = ""),width = 20, height = 20, units = "cm")
+      ggsave(paste(m.summary.output.folder,"m.prop.correct.sp.jpeg",sep = ""),width = 20, height = 20, units = "cm")
 
     plot.by.sp <- prop.cor %>%
       ggplot(aes(x=Site.Physiog_5m , y=Model,col = Model.no)) + 
@@ -98,28 +103,35 @@ m.summary.output.folder = "D:/PEM_DATA/Analysis/RandomForest/outputs/Model_compa
     prop.cor <- prop.cor %>% gather(prop.cor, "Model",2:length(prop.cor))
     prop.cor<- prop.cor %>% mutate(Model.no = str_remove(prop.cor,"_prop.correct"))
     
+    # if you want to plot only some models
+    mlist = c("M29","M31","M32")
+    prop.cor <- prop.cor %>% dplyr::filter(Model.no %in% mlist)
+    prop.cor <- prop.cor %>% drop_na(Model)
+    
+    
+    
     plot.all.sp <- prop.cor %>%
       ggplot( aes(x=Model.no, y=Model)) + 
       geom_boxplot () +
-       geom_jitter(size=1, position=position_jitter(width=0.2, height=0.0001)) +
+       geom_jitter(size=3, position=position_jitter(width=0.02, height=0.0001)) +
       xlab("Models") + 
       ylab("Site Class (prop. correctly assigned)") + 
       ggtitle("Proportion of correctly assigned Site Class per model")+
       scale_y_continuous(limits = c(0,1))
     plot.all.sp
-    ggsave(paste(m.summary.output.folder,"m.prop.correct.sc.pdf",sep = ""),width = 20, height = 20, units = "cm")
+    ggsave(paste(m.summary.output.folder,"m.prop.correct.sc.jpeg",sep = ""),width = 20, height = 20, units = "cm")
     
     plot.by.sp <- prop.cor %>%
       ggplot(aes(x=Site.Class_5m , y=Model,col = Model.no)) + 
-      geom_point()  + 
-      #geom_jitter(size=1, position=position_jitter(width=0.1, height=0.0001)) +
+     # geom_point(size = 3)  + 
+      geom_jitter(size=3, position=position_jitter(width=0.15, height=0.03)) +
       xlab("Models") + 
       ylab("Site Class (prop. correctly assigned)")+
       theme(axis.text.x = element_text(angle = 90))+ 
       ggtitle("Correctly assigned Site Class per model") +
-      scale_y_continuous(limits = c(0,1))
+      scale_y_continuous(limits = c(-0.05,1))
     plot.by.sp    
-    ggsave(paste(m.summary.output.folder,"m.correct.sc.pdf",sep = ""),width = 20, height = 20, units = "cm")
+    ggsave(paste(m.summary.output.folder,"m.correct.sc.jpeg",sep = ""),width = 20, height = 20, units = "cm")
     
 
 #### Site Realm ####
