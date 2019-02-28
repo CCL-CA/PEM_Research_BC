@@ -50,16 +50,16 @@ mrf <- read.xlsx("Model_params.xlsx", "Model_rF", header = TRUE,colClasses=NA)
 mmu <- read.xlsx("Model_params.xlsx","Model_MapUnit",header = TRUE,colClasses = NA)
 
 m.to.run <- mparam %>% dplyr::select(To.Run,model.no) %>% dplyr::filter(To.Run == 1) # make a listof models to run
-m.to.run <- m.to.run$model.no
-m.to.run
-m.to.run <- 4; m.no <- m.to.run # tester
+m.to.run <- m.to.run$model.no 
+
+m.to.run <- 28; m.no <- m.to.run # tester line
 
 if(length(m.to.run)<2) { 
   m.no <- m.to.run } else { 
     print("You are now running multiple models - this may take some time.....") } 
-for (i in 1:length(m.to.run)) { 
-  #i = 1
-  m.no <- m.to.run[i]
+  for (i in 1:length(m.to.run)) { 
+#  #i = 1
+    m.no <- m.to.run[i]
   
   print (paste("currently running model:", m.no,sep = ""))
   
@@ -90,6 +90,16 @@ for (i in 1:length(m.to.run)) {
   # - Site.Class_5m
   # - Site.Series.Map.Unit_5m
   # - Site.Var.Phase.Map.Unit_5m
+  
+  # split out forested SBSmc2 forested
+  pts<- pts %>% dplyr::filter(Biogeoclimatic.Unit == "SBSmc2")
+  pts<- pts %>% dplyr::filter(Site.Physiog_5m == "Forest")
+  
+  # split out forested SBSmc2 forested
+  #pts<- pts %>% dplyr::filter(Site.Physiog_5m == "NoForest")
+  
+  
+  
   
   #############################################3    
   # Part 2: Select the response variable
@@ -183,13 +193,60 @@ for (i in 1:length(m.to.run)) {
   
   # Subset to the minimum number of points 
   min.no <- as.character(tpt.metrics[7,2])  
-  min.no <- 5
   response.number <- count(pts, vars= pts[,c(response.name)])
   response.good <-response.number[response.number$n >min.no,]             ## set minimum number of training points to allow inclusion of unit
   pts <- pts [pts[,c(response.name)] %in% response.good$vars,]
   length(pts$X)
   
-  # STILL TO DO 
+  
+  ## Balancing the sample design
+  # get a summary of the points 
+  pts.sum <- pts %>%
+    group_by(Site.Series.Map.Unit_5m) %>%
+    summarise(count = n()) 
+  median(pts.sum$count)
+  
+  pts.sum = as.data.frame(pts.sum)
+    ggplot(pts.sum,aes(Site.Series.Map.Unit_5m,count))+
+    geom_bar(stat = "identity")  
+   # ggsave(paste(m.summary.output.folder,"ss.count.jpeg",sep = ""),width = 30, height = 20, units = "cm")
+  
+  # STILL TO Automate 
+  # Balanced design of 50 or more 
+  pts.over.50 <- pts.sum %>% dplyr::filter(count > 29) ;
+  pts.over.50 <- pts.over.50[,'Site.Series.Map.Unit_5m']
+  #pts.o50 <- pts %>% dplyr::filter(Site.Var.Phase.Map.Unit_5m %in% pts.over.50)
+  #SBSmc2/01 SBSmc2/05 SBSmc2/06 SBSmc2/10 
+  
+  #pts.sum <- pts.o50  %>%
+  #  group_by(Site.Series.Map.Unit_5m) %>%
+  #  summarise(count = n())
+  
+  pts.o501 <- pts  %>% dplyr::filter(Site.Var.Phase.Map.Unit_5m == "SBSmc2/01")
+  pts.o501 <-sample_n(pts.o501, 29, replace = FALSE)
+  
+  pts.o502 <- pts  %>% dplyr::filter(Site.Var.Phase.Map.Unit_5m == "SBSmc2/05")
+  pts.o502 <-sample_n(pts.o502, 29, replace = FALSE)
+  pts.o50all <- rbind(pts.o501,pts.o502)
+  
+  pts.o503 <- pts  %>% dplyr::filter(Site.Var.Phase.Map.Unit_5m == "SBSmc2/06")
+  pts.o503 <-sample_n(pts.o503, 29, replace = FALSE)
+  pts.o50all <- rbind(pts.o50all,pts.o503)
+  
+  pts.o504 <- pts %>% dplyr::filter(Site.Var.Phase.Map.Unit_5m == "SBSmc2/10") # possible error here with different values
+  pts.o504 <-sample_n(pts.o504, 29, replace = FALSE)
+  pts.o50all <- rbind(pts.o50all,pts.o504)
+  
+  pts.under.50 <- pts.sum %>% filter(count < 29) 
+  pts.under.50 <- pts.under.50[,'Site.Series.Map.Unit_5m']
+  pts.u50 <- pts %>% dplyr::filter(Site.Var.Phase.Map.Unit_5m %in% pts.under.50)
+  
+  pts.all<- rbind(pts.o50all,pts.u50)
+  pts.sum <- pts.all  %>%
+    group_by(Site.Series.Map.Unit_5m) %>%
+    summarise(count = n()); pts.sum 
+ 
+  pts <- pts.all
   # decide on what balance needs to be set (none,min,medium, etc)
   #mean.no <- round(mean(response.number$n),0)
   #length(pts$X)
@@ -361,10 +418,6 @@ for (i in 1:length(m.to.run)) {
   #map.sd=TRUE)
   
 } # end loop for multiple model runs. 
-
-
-
-
 
 
 
