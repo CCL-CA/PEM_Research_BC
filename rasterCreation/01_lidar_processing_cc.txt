@@ -1,0 +1,71 @@
+:: LAS Data Processing -- Script Developed by Lukas Jaron of UBC 
+:: Minor edits for env specific implementation by C. Chisholm
+:: Uncommmented a number o lines for processing
+:: March 6, 2019
+
+:: Set LASTools into the PATH 
+PATH=%PATH%;C:\LAStools\bin\
+
+:: Create folder in a drive (all LAS files in the input Folder and Leave the output one blank)
+set f_in=E:\LAS\aleza_tiled
+set f_out=E:\PEM_Processing_cc\2019\LAS
+
+:: create folders if they don't exist
+IF NOT EXIST %f_out% MKDIR %f_out%
+IF NOT EXIST %f_out%\_laz MKDIR %f_out%\_laz
+IF NOT EXIST %f_out%\1_tiles MKDIR %f_out%\1_tiles
+IF NOT EXIST %f_out%\2_tiles_filtered\_NB MKDIR %f_out%\2_tiles_filtered\_NB
+IF NOT EXIST %f_out%\3_tiles_ground\_NB MKDIR %f_out%\3_tiles_ground\_NB
+IF NOT EXIST %f_out%\4_tile_dem MKDIR %f_out%\4_tile_dem
+IF NOT EXIST %f_out%\4_tile_dem\1mmerged MKDIR %f_out%\1mmerged
+IF NOT EXIST %f_out%\5_tiles_norm\_NB MKDIR %f_out%\5_tiles_norm\_NB
+IF NOT EXIST %f_out%\6_clipped\all MKDIR %f_out%\6_clipped\all
+IF NOT EXIST %f_out%\6_clipped\ground MKDIR %f_out%\6_clipped\ground
+IF NOT EXIST %f_out%\7_chm MKDIR %f_out%\7_chm
+IF NOT EXIST %f_out%\8_metrics MKDIR %f_out%\8_metrics
+IF NOT EXIST %f_out%\8_metrics\05m MKDIR %f_out%\8_metrics\05m
+IF NOT EXIST %f_out%\8_metrics\10m MKDIR %f_out%\8_metrics\10m
+IF NOT EXIST %f_out%\8_metrics\25m MKDIR %f_out%\8_metrics\25m
+IF NOT EXIST %f_out%\9_rasters MKDIR %f_out%\9_rasters
+
+
+IF NOT EXIST %f_out%\_lasNoBuffer MKDIR %f_out%\_lasNoBuffer
+:: CC Added this line as the Aleza Data came with buffers.
+lastile -i %f_in%\*.las -remove_buffer  -odir %f_out%\_lasNoBuffer -cores 4
+
+:: Convert to LAZ compressed format
+REM las2las -i %f_in%\*.las -odir %f_out%\_laz -olaz -cores 4
+las2las -i %f_out%\_lasNoBuffer\*.las -odir %f_out%\_laz -olaz -cores 4
+
+REM :: tile  (can change number of cores to fit cpu)
+lastile -i %f_out%\_laz\*.laz -tile_size 200 -buffer 12 -odir %f_out%\1_tiles -olaz -cores 4
+
+REM :: filtering
+lasnoise -i %f_out%\1_tiles\*.laz -step_xy 2 -step_z 1 -isolated 6 -odir %f_out%\2_tiles_filtered -olaz  -cores 4
+
+:: convert points to rasters.
+:: here the step value indicates the resolution of the DTM (Digital Terrain Model)	
+:: Can be REM'd if DEm is already there
+ 
+lastile -i %f_out%\2_tiles_filtered\*.laz -remove_buffer -odir %f_out%\4_tile_dem\ -olaz -cores 4
+:: CC: This line below fails -- too many points to buffer 
+REM las2dem -i %f_out%\4_tile_dem\*.laz -keep_class 2 9 -step 1 -merged -odir %f_out%\9_rasters -o dtm.asc
+:: 1m dtm
+blast2dem -i  %f_out%\4_tile_dem\*.laz -keep_class 2 9 -step 1 -merged -odir %f_out%\9_rasters -o dtm_01m.asc
+:: 2.5m dtm
+blast2dem -i  %f_out%\4_tile_dem\*.laz -keep_class 2 9 -step 2.5 -merged -odir %f_out%\9_rasters -o dtm_250cm.asc
+
+:: CC: I do not understand what this line was for
+REM txt2las -i %f_out%\9_rasters -odir %f_out%\9_rasters
+
+:: normalize heights
+lasheight -i %f_out%\2_tiles_filtered\*.laz -odir %f_out%\5_tiles_norm\ -olaz -replace_z -cores 4
+
+::REMOVE BUFFERS
+lastile -i %f_out%\5_tiles_norm\*.laz -remove_buffer -odir %f_out%\5_tiles_norm\_NB\ -olaz -cores 4
+
+:: Process metrics at 25,10 and 5m
+lascanopy -i %f_out%\5_tiles_norm\_NB\*.laz -merged -p 95 90 75 50 -std -cov -cover_cutoff 2.0 -step 25 -o %f_out%\8_metrics\25m\.asc 
+lascanopy -i %f_out%\5_tiles_norm\_NB\*.laz -merged -p 95 90 75 50 -std -cov -cover_cutoff 2.0 -step 10 -o %f_out%\8_metrics\10m\.asc 
+lascanopy -i %f_out%\5_tiles_norm\_NB\*.laz -merged -p 95 90 75 50 -std -cov -cover_cutoff 2.0 -step 5 -o %f_out%\8_metrics\05m\.asc 
+pause
