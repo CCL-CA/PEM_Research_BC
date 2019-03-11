@@ -16,7 +16,7 @@
 #    - set up temp. folder
 # C. Function: pemDerivedLayers() requires the DTM, and makes system calls to
 #                     SAGA to generate all dtm derived layers
-# D. Convert all SAGA generated layers to .asc or .tif (or other) PENDING
+# D. Convert all SAGA generated layers to .asc or .tif (or other) 
 
 ## Future refinement:
 # 1. build loop to call function for all DTM resolutions
