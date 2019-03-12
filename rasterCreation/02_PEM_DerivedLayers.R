@@ -72,11 +72,34 @@
 ##### Set Up Environmental Variables ----------------------------------
 # INPUTS: Load DTM Raster ------------
   DTMpath <- "E:\\tmpGIS\\pemR\\25m"
-  DTM     <- "dtm_25m.tif"
-  DTM <- readGDAL(paste(DTMpath, "\\", DTM, sep = "")) # read with GDAL, and Write with GDAL works well.
-  # DTM <- raster(paste(DTMpath, "\\", DTM, sep = "")) # read with raster package
-
-
+  DTMname     <- "dtm_25m.tif"
+  DTM <- readGDAL(paste(DTMpath, "\\", DTMname, sep = "")) # read with GDAL, and Write with GDAL works well.
+  
+  ##### Map Projection ----------------------------------------------
+  # SEE WARNING 
+  # crs(DTM) # Confirm if it is correct 
+  
+  PROJ <- crs(DTM) # Use if the layer has a DTM 
+  
+  # Assign Projection if not declared 
+  # WARNING ONLY Assign if known to be correct 
+  PROJ <- crs(paste("+init=epsg:",3005, sep = ""))  #26910 is the EPSG codefor  NAD83 UTM 10U
+                                #  3005 for BC Albers
+  crs(DTM) <- PROJ 
+  crs(DTM)
+  
+  
+  
+  # Transform it needed -----------------
+  # WARNING This will warp the data ... ideally DTM is generated from the transformed LAS
+  rTransform <- function(){
+    DTM <- raster(paste(DTMpath, "\\", DTMname, sep = "")) # raster package is problematic for SAGA format
+    DTM <- projectRaster(DTM, crs = PROJ)
+    writeRaster(DTM, paste(DTMpath, "\\", "tmp.tif", sep= ""), overwrite = TRUE)  #
+    DTM <- readGDAL(paste(DTMpath, "\\", "tmp.tif", sep = "")) # re-open as with GDAL to facilitateSAGA export 
+    file.remove(paste(DTMpath, "\\", "tmp.tif", sep = ""))
+  }
+  # rTransform() # Only if necessary 
 
 
 # OUTPUTS: ------------------------------------------------------------
@@ -86,21 +109,10 @@
 
   setwd(tmpOut)
 
-
-
-
-##### Project Projection ----------------------------------------------
-  PROJ <- crs(DTM) ; PROJ   # OR assign another ....
-                   # if transforamtion should take place do it now or at the
-                   # very end
-
-
-
-
 ##### >> Stage 00 -- Convert DTM to SAGA format ##############################
   sDTM <- "dtm.sdat"
   sDTM <- paste(tmpOut, "\\", sDTM, sep = "")
-  # writeRaster(DTM, sdatDTM, driver = "SAGA", overwrite = TRUE)  # save SAGA Version
+  # writeRaster(DTM, sDTM, driver = "SAGA", overwrite = TRUE)  # save SAGA Version
   writeGDAL(DTM, sDTM, driver = "SAGA")  # save SAGA Version using rgdal
   rm(DTM) # not needed
 
@@ -263,13 +275,45 @@ convertASC <- function(){
       write.asciigrid(r, w, attr = 1, na.value = -9999) #sp package
 
     }
+}
+
+# convert .sdat to .tif format ----------------------------------------
+# Requires the input directory 
+convertTIF <- function(InputDir, outDir, iRasterType){ # specify directories and raster inputType
+  # Testing
+  # InputDir <- "E:\\tmpGIS\\pemR\\25m\\"
+  # outDir   <- "E:\\tmpGIS\\pemR\\25m\\tif"
+  # iRasterType <- "asc"
+  
+  
+  ifelse(!dir.exists(file.path(outDir)),               #if tmpOut Does not Exists
+          dir.create(file.path(outDir)), FALSE)        #create tmpOut
+  
+  setwd(InputDir)
+  rasterfiles <- list.files(pattern = iRasterType)
+  rasterfiles <- grep(rasterfiles, pattern = "aux.xml", inv = T, value = T) #inv inverts (not), value returns the names
+  print(rasterfiles)
+  # rasterfiles <- rasterfiles[-c(2, 3, 6)] # Remove intermediate rasters and dtm from the list....
+  # HR also included the filled_sinks.dtm ... in my mind this is a
+  outFiles <- gsub(iRasterType, "tif", rasterfiles )
+  print(outFiles)
+  
+  # Use gdal to convert these to tif ----------------------------------
+  for(i in 1:length(rasterfiles)){
+    # i <- 1 # Testing
+    r <- readGDAL(rasterfiles[i])
+    w <- paste(outDir,"\\", outFiles[i], sep = "")
+    writeGDAL(r, w)
+  }
+}
 
 
-  # Clean up --------------------------- WARNING deletes intermediate files ------------------
-    setwd(DTMpath)
-    rm(sDTM, tmpOut)
-    unlink("sagaTmp", recursive = TRUE)
-    file.remove("sagaTmp", recursive = TRUE )
+# Clean up --------------------------- WARNING deletes intermediate files ------------------
+cleanUp <- function(){
+    setwd(DTMpath)   # change dir (one level up)
+    rm(sDTM, tmpOut) # remove unneeded variables
+    unlink("sagaTmp", recursive = TRUE)       # unlink directory 
+    file.remove("sagaTmp", recursive = TRUE ) # remove tmp dir and files.
 }
 
 #########################################################################
@@ -278,3 +322,10 @@ convertASC <- function(){
   pemDerivedLayers(sDTM)
 # Convert to .asc
   convertASC()
+# Clean up -- remove tmp files 
+  cleanUp()
+    
+## Utility -- 
+# Alternate convert to .tif 
+  # specify InputDir, OutputDir, InputFileFormat (e.g. "asc", "sdat")
+  # convertTIF("E:\\tmpGIS\\pemR\\25m\\sagaTmp", "E:\\tmpGIS\\pemR\\25m\\tif", "sdat")
