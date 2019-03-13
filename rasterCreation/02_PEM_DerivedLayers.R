@@ -8,6 +8,9 @@
 #### R script by Colin Chisholm
 #### Initiated:  March 10, 2019
 
+#### Tested to work with SAGA 7.2 
+#### https://sourceforge.net/projects/saga-gis/files/SAGA%20-%207/SAGA%20-%207.2.0/saga-7.2.0_x64.zip/download
+
 #### OVERVIEW ###########
 # A. Install and Load Libraried
 # B. Set up working Environment
@@ -40,13 +43,13 @@
     # if(length(new.packages)) install.packages(new.packages)
 
 # # Repeating the pattern for packages CC uses --------------------------
-    # ls <- c("dplyr","ggplot2","tidyr","stringr",
-    #         "readxl", "foreign", "lsr", "car",  "moments", "psych",
-    #         "latex2exp","gtools", "knitr", "rgeos", "maptools", "raster", "sp",
-    #         "rgdal", "mapview", "sf", "RSAGA")
-    # new.packages <- ls[!(ls %in% installed.packages()[,"Package"])]
-    # if(length(new.packages)) install.packages(new.packages)
-    # rm(ls, new.packages)
+    ls <- c("dplyr","ggplot2","tidyr","stringr",
+            "readxl", "foreign", "lsr", "car",  "moments", "psych",
+            "latex2exp","gtools", "knitr", "rgeos", "maptools", "raster", "sp",
+            "rgdal", "mapview", "sf", "RSAGA")
+    new.packages <- ls[!(ls %in% installed.packages()[,"Package"])]
+    if(length(new.packages)) install.packages(new.packages)
+    rm(ls, new.packages)
 
 # Load Needed Libraried -----------------------------------------------
     x <- c("dplyr","ggplot2","tidyr","stringr")             # Data table manipulation and graphing
@@ -311,9 +314,9 @@ convertTIF <- function(InputDir, outDir, iRasterType){ # specify directories and
 # Clean up --------------------------- WARNING deletes intermediate files ------------------
 cleanUp <- function(){
     setwd(DTMpath)   # change dir (one level up)
-    rm(sDTM, tmpOut) # remove unneeded variables
+    #rm(sDTM, tmpOut) # remove unneeded variables 
     unlink("sagaTmp", recursive = TRUE)       # unlink directory 
-    file.remove("sagaTmp", recursive = TRUE ) # remove tmp dir and files.
+    #file.remove("sagaTmp", recursive = TRUE ) # remove tmp dir and files.
 }
 
 #########################################################################
