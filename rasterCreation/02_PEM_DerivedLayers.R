@@ -8,12 +8,8 @@
 #### R script by Colin Chisholm
 #### Initiated:  March 10, 2019
 
-<<<<<<< HEAD
 #### Tested to work with SAGA 7.2 
 #### https://sourceforge.net/projects/saga-gis/files/SAGA%20-%207/SAGA%20-%207.2.0/saga-7.2.0_x64.zip/download
-=======
-#### Note that this Script is tested with use of SAGA 6.2 ###############
->>>>>>> 9dffb38d44ff698b1b3c0c9fe3db771f9e13b821
 
 #### OVERVIEW ###########
 # A. Install and Load Libraried
