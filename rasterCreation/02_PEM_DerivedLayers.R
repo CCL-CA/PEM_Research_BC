@@ -8,6 +8,8 @@
 #### R script by Colin Chisholm
 #### Initiated:  March 10, 2019
 
+#### Note that this Script is tested with use of SAGA 6.2 ###############
+
 #### OVERVIEW ###########
 # A. Install and Load Libraried
 # B. Set up working Environment
