@@ -11,15 +11,17 @@
 #### Tested to work with SAGA 7.2 
 #### https://sourceforge.net/projects/saga-gis/files/SAGA%20-%207/SAGA%20-%207.2.0/saga-7.2.0_x64.zip/download
 
-#### OVERVIEW ###########
+#### OVERVIEW / outline ###########
 # A. Install and Load Libraried
 # B. Set up working Environment
 #    - Link to SAGA install (machine specific)
-#    - Connect and load DTM
-#    - set up temp. folder
-# C. Function: pemDerivedLayers() requires the DTM, and makes system calls to
-#                     SAGA to generate all dtm derived layers
-# D. Convert all SAGA generated layers to .asc or .tif (or other) 
+# C. Load Functions: 
+#    - PrepSAGA() creates a SAGA version of the DTM ensuring Projection Info is assigned.  Option to transform projection is commented out
+#    - pemDerivedLayers() requires the DTM, and makes system calls to SAGA to generate all dtm derived layers
+#    - convertASC()  converts all the SAGA files to .asc (ESRI raster).  Also ignores files used for processing (e.g. Channel Network, Basins)
+#    - convertTIF()  option to convert a set of rasters to geoTiff 
+#    - cleanUp()  removes temp files (SAGA .sdats) 
+# D. >> RUN SCRIPT HERE << -- Set Variables and call the functions 
 
 ## Future refinement:
 # 1. build loop to call function for all DTM resolutions
@@ -71,13 +73,9 @@
 
 
 
+##### FUNCTIONS ######################################################################
 
-##### Set Up Environmental Variables ----------------------------------
-# INPUTS: Load DTM Raster ------------
-  DTMpath <- "E:\\tmpGIS\\pemR\\25m"
-  DTMname     <- "dtm_25m.tif"
-  DTM <- readGDAL(paste(DTMpath, "\\", DTMname, sep = "")) # read with GDAL, and Write with GDAL works well.
-  
+PrepSAGA <- function(){
   ##### Map Projection ----------------------------------------------
   # SEE WARNING 
   # crs(DTM) # Confirm if it is correct 
@@ -106,18 +104,20 @@
 
 
 # OUTPUTS: ------------------------------------------------------------
-  tmpOut <- paste(DTMpath, "\\", "sagaTmp", sep = "")
+  # tmpOut <- paste(DTMpath, "\\", "sagaTmp", sep = "")
   ifelse(!dir.exists(file.path(tmpOut)),               #if tmpOut Does not Exists
           dir.create(file.path(tmpOut)), FALSE)        #create tmpOut
 
   setwd(tmpOut)
 
 ##### >> Stage 00 -- Convert DTM to SAGA format ##############################
-  sDTM <- "dtm.sdat"
-  sDTM <- paste(tmpOut, "\\", sDTM, sep = "")
+  # sDTM <- "dtm.sdat"
+  # sDTM <- paste(tmpOut, "\\", sDTM, sep = "")
   # writeRaster(DTM, sDTM, driver = "SAGA", overwrite = TRUE)  # save SAGA Version
   writeGDAL(DTM, sDTM, driver = "SAGA")  # save SAGA Version using rgdal
   rm(DTM) # not needed
+}
+
 
 
 
@@ -265,8 +265,9 @@ pemDerivedLayers <- function(sDTM){
 convertASC <- function(){
     rasterfiles <- list.files(pattern = ".sdat")
     rasterfiles <- grep(rasterfiles, pattern = "aux.xml", inv = T, value = T) #inv inverts (not), value returns the names
-    # rasterfiles
-    rasterfiles <- rasterfiles[-c(2, 3, 6)] # Remove intermediate rasters and dtm from the list....
+    rasterfiles
+    rasterfiles <- rasterfiles[-c(2, 3, 6, 15, 16)] # Remove intermediate rasters and dtm from the list....
+      # Basins, Channel_network_grid, dtm (don't need to recreate), Specific_Catchment, TotalCatchment
                                                # HR also included the filled_sinks.dtm ... in my mind this is a
     outFiles <- gsub("sdat", "asc", rasterfiles )
     outFiles
@@ -319,8 +320,26 @@ cleanUp <- function(){
     #file.remove("sagaTmp", recursive = TRUE ) # remove tmp dir and files.
 }
 
-#########################################################################
-## EXECUTE Script #######################################################
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+## RUN SCRIPT HERE --  EXECUTE Script #####################################
+
+##### Set Up Environmental Variables ----------------------------------
+# INPUTS: Load DTM Raster ------------
+# Change these to fit needs 
+  DTMpath <- "E:\\tmpGIS\\pemR\\05m"  # where is the dtm located
+  DTMname     <- "dtm_05m.tif"        # name of the DTM 
+  DTM <- readGDAL(paste(DTMpath, "\\", DTMname, sep = "")) # read with GDAL, and Write with GDAL works well.
+
+# Temporary File Settings -- used to create a tmp folder in the same directory as the original DTM 
+# Should not need to be changed -- these need to be global vaiables as they are used by multiple functions.
+  tmpOut <- paste(DTMpath, "\\", "sagaTmp", sep = "")
+  sDTM <- "dtm.sdat"
+  sDTM <- paste(tmpOut, "\\", sDTM, sep = "")
+
+
+##### Call the functions ----------------------------------------------
+# Prepare for SAGA execution 
+  PrepSAGA()
 # Run all layers at once
   pemDerivedLayers(sDTM)
 # Convert to .asc
