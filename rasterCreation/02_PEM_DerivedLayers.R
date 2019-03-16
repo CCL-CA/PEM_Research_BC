@@ -80,12 +80,12 @@ PrepSAGA <- function(){
   # SEE WARNING 
   # crs(DTM) # Confirm if it is correct 
   
-  PROJ <- crs(DTM) # Use if the layer has a DTM 
+  # PROJ <- crs(DTM) # Use if the layer has a DTM 
   
   # Assign Projection if not declared 
   # WARNING ONLY Assign if known to be correct 
-  PROJ <- crs(paste("+init=epsg:",3005, sep = ""))  #26910 is the EPSG codefor  NAD83 UTM 10U
-                                #  3005 for BC Albers
+  # PROJ <- crs(paste("+init=epsg:",3005, sep = ""))  #26910 is the EPSG codefor  NAD83 UTM 10U
+  #                               #  3005 for BC Albers
   crs(DTM) <- PROJ 
   crs(DTM)
   
@@ -265,7 +265,7 @@ pemDerivedLayers <- function(sDTM){
 convertASC <- function(){
     rasterfiles <- list.files(pattern = ".sdat")
     rasterfiles <- grep(rasterfiles, pattern = "aux.xml", inv = T, value = T) #inv inverts (not), value returns the names
-    rasterfiles
+    # rasterfiles
     rasterfiles <- rasterfiles[-c(2, 3, 6, 15, 16)] # Remove intermediate rasters and dtm from the list....
       # Basins, Channel_network_grid, dtm (don't need to recreate), Specific_Catchment, TotalCatchment
                                                # HR also included the filled_sinks.dtm ... in my mind this is a
@@ -276,7 +276,10 @@ convertASC <- function(){
     for(i in 1:length(rasterfiles)){
       r <- readGDAL(rasterfiles[i])
       w <- paste("..\\", outFiles[i], sep = "")
-      write.asciigrid(r, w, attr = 1, na.value = -9999) #sp package
+      # OLD Version lost projection info write.asciigrid(r, w, attr = 1, na.value = -9999)#, proj4string = CRS(r)) #sp package
+      writeGDAL(r, w)
+      
+      # writeRaster(r, w, format = "ascii")
 
     }
 }
@@ -326,10 +329,15 @@ cleanUp <- function(){
 ##### Set Up Environmental Variables ----------------------------------
 # INPUTS: Load DTM Raster ------------
 # Change these to fit needs 
-  DTMpath <- "E:\\tmpGIS\\pemR\\05m"  # where is the dtm located
-  DTMname     <- "dtm_05m.tif"        # name of the DTM 
+  DTMpath <- "E:\\tmpGIS\\pemR\\25m"  # where is the dtm located
+  DTMname     <- "dtm_25m.tif"        # name of the DTM 
+  
   DTM <- readGDAL(paste(DTMpath, "\\", DTMname, sep = "")) # read with GDAL, and Write with GDAL works well.
 
+  PROJ <- crs(paste("+init=epsg:", 26910, sep = ""))  #26910 is the EPSG codefor  NAD83 UTM 10U
+  #                               #  3005 for BC Albers
+  
+  
 # Temporary File Settings -- used to create a tmp folder in the same directory as the original DTM 
 # Should not need to be changed -- these need to be global vaiables as they are used by multiple functions.
   tmpOut <- paste(DTMpath, "\\", "sagaTmp", sep = "")
@@ -351,3 +359,7 @@ cleanUp <- function(){
 # Alternate convert to .tif 
   # specify InputDir, OutputDir, InputFileFormat (e.g. "asc", "sdat")
   # convertTIF("E:\\tmpGIS\\pemR\\25m\\sagaTmp", "E:\\tmpGIS\\pemR\\25m\\tif", "sdat")
+  # cleanUp()
+  
+  
+  
