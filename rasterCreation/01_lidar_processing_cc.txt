@@ -48,15 +48,12 @@ lasnoise -i %f_out%\1_tiles\*.laz -step_xy 2 -step_z 1 -isolated 6 -odir %f_out%
 :: Can be REM'd if DEm is already there
  
 lastile -i %f_out%\2_tiles_filtered\*.laz -remove_buffer -odir %f_out%\4_tile_dem\ -olaz -cores 4
-:: CC: This line below fails -- too many points to buffer 
+:: CC: This line below fails -- too many points to buffer using blast2dem (confimred with LJ) 
 REM las2dem -i %f_out%\4_tile_dem\*.laz -keep_class 2 9 -step 1 -merged -odir %f_out%\9_rasters -o dtm.asc
 :: 1m dtm
 blast2dem -i  %f_out%\4_tile_dem\*.laz -keep_class 2 9 -step 1 -merged -odir %f_out%\9_rasters -o dtm_01m.asc
 :: 2.5m dtm
 blast2dem -i  %f_out%\4_tile_dem\*.laz -keep_class 2 9 -step 2.5 -merged -odir %f_out%\9_rasters -o dtm_250cm.asc
-
-:: CC: I do not understand what this line was for
-REM txt2las -i %f_out%\9_rasters -odir %f_out%\9_rasters
 
 :: normalize heights
 lasheight -i %f_out%\2_tiles_filtered\*.laz -odir %f_out%\5_tiles_norm\ -olaz -replace_z -cores 4
@@ -65,7 +62,8 @@ lasheight -i %f_out%\2_tiles_filtered\*.laz -odir %f_out%\5_tiles_norm\ -olaz -r
 lastile -i %f_out%\5_tiles_norm\*.laz -remove_buffer -odir %f_out%\5_tiles_norm\_NB\ -olaz -cores 4
 
 :: Process metrics at 25,10 and 5m
-lascanopy -i %f_out%\5_tiles_norm\_NB\*.laz -merged -p 95 90 75 50 -std -cov -cover_cutoff 2.0 -step 25 -o %f_out%\8_metrics\25m\.asc 
-lascanopy -i %f_out%\5_tiles_norm\_NB\*.laz -merged -p 95 90 75 50 -std -cov -cover_cutoff 2.0 -step 10 -o %f_out%\8_metrics\10m\.asc 
-lascanopy -i %f_out%\5_tiles_norm\_NB\*.laz -merged -p 95 90 75 50 -std -cov -cover_cutoff 2.0 -step 5 -o %f_out%\8_metrics\05m\.asc 
+:: CC added name for output as ModelMap does not deal well with a file starting with e.g. _p95.asc (it adds an X like X_p95.asc and thereby breaks the filelink) 
+lascanopy -i %f_out%\5_tiles_norm\_NB\*.laz -merged -p 95 90 75 50 -std -cov -cover_cutoff 2.0 -step 25 -o %f_out%\8_metrics\25m\ALRF.asc 
+lascanopy -i %f_out%\5_tiles_norm\_NB\*.laz -merged -p 95 90 75 50 -std -cov -cover_cutoff 2.0 -step 10 -o %f_out%\8_metrics\10m\ALRF.asc 
+lascanopy -i %f_out%\5_tiles_norm\_NB\*.laz -merged -p 95 90 75 50 -std -cov -cover_cutoff 2.0 -step 5 -o %f_out%\8_metrics\05m\ALRF.asc 
 pause
