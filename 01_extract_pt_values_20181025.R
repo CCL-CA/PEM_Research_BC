@@ -1,4 +1,10 @@
-# Extract raster values to point files
+# his scritp is supersseeded: 
+
+#by 01_extract_pt_values
+
+
+
+#Extract raster values to point files
 # For Kamloops PEM project - extract attributes to our training and testing points
 # August 2016 - Heather Richardson
 # adjusted for test and training data sets 
